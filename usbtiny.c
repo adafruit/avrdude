@@ -533,6 +533,8 @@ static int usbtiny_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
       // Trinket's bootloader does not support byte-wise writes
 
       // return -1;
+
+      usleep(10000); // worst case delay for single page erase plus single page write
     }
 
     next = i + chunk;       // Calculate what address we're at now
