@@ -22,6 +22,8 @@
  * Please see http://www.xs4all.nl/~dicks/avr/usbtiny/
  *        and http://www.ladyada.net/make/usbtinyisp/
  * For example schematics and detailed documentation
+ *
+ * This variation of usbtiny.c has a dirty hack to support Trinket's bootloader
  */
 
 #include "ac_cfg.h"
@@ -145,7 +147,7 @@ static void check_retries (PROGRAMMER * pgm, const char* operation)
 // Wrapper for simple usb_control_msg messages to send data to programmer
 static int usb_out (PROGRAMMER * pgm,
 		    unsigned int requestid, unsigned int val, unsigned int index,
-		    unsigned char* buffer, int buflen, int bitclk )
+		    unsigned char* buffer, int buflen, int bitclk , char suppressErr)
 {
   int nbytes;
   int timeout;
@@ -161,8 +163,10 @@ static int usb_out (PROGRAMMER * pgm,
 			    (char *)buffer, buflen,
 			    timeout);
   if (nbytes != buflen) {
-    fprintf(stderr, "\n%s: error: usbtiny_send: %s (expected %d, got %d)\n",
-	    progname, usb_strerror(), buflen, nbytes);
+    if (suppressErr == 0) {
+      fprintf(stderr, "\n%s: error: usbtiny_send: %s (expected %d, got %d)\n",
+        progname, usb_strerror(), buflen, nbytes);
+    }
     return -1;
   }
 
@@ -226,9 +230,7 @@ static	int	usbtiny_open(PROGRAMMER* pgm, char* name)
       if (dev->descriptor.idVendor == USBTINY_VENDOR
 	  && dev->descriptor.idProduct == USBTINY_PRODUCT ) {   // found match?
     if(verbose)
-      fprintf(stderr,
-	      "%s: usbdev_open(): Found USBtinyISP, bus:device: %s:%s\n",
-	      progname, bus->dirname, dev->filename);
+      printf("avrdude: usbdev_open(): Found USBtinyISP, bus:device: %s:%s\n", bus->dirname, dev->filename);
     // if -P was given, match device by device name and bus name
     if(name != NULL &&
       (NULL == dev_name ||
@@ -425,10 +427,9 @@ static void usbtiny_disable ( PROGRAMMER* pgm ) {}
  *  per byte
 */
 static int usbtiny_paged_load (PROGRAMMER * pgm, AVRPART * p, AVRMEM* m,
-                               unsigned int page_size,
-                               unsigned int i, unsigned int n_bytes)
+				    int page_size, int n_bytes )
 {
-  unsigned int maxaddr = i + n_bytes;
+  int i;
   int chunk;
   int function;
 
@@ -440,7 +441,7 @@ static int usbtiny_paged_load (PROGRAMMER * pgm, AVRPART * p, AVRMEM* m,
     function = USBTINY_EEPROM_READ;
   }
 
-  for (; i < maxaddr; i += chunk) {
+  for (i = 0; i < n_bytes; i += chunk) {
     chunk = PDATA(pgm)->chunk_size;         // start with the maximum chunk size possible
 
     // If we want to xmit less than a chunk, thats OK
@@ -460,6 +461,9 @@ static int usbtiny_paged_load (PROGRAMMER * pgm, AVRPART * p, AVRMEM* m,
                               // usb_in() multiplies this per byte.
       return -1;
     }
+
+    // Tell avrdude how we're doing to provide user feedback
+    report_progress(i + chunk, n_bytes, NULL );
   }
 
   check_retries(pgm, "read");
@@ -472,10 +476,9 @@ static int usbtiny_paged_load (PROGRAMMER * pgm, AVRPART * p, AVRMEM* m,
  *  per byte.
 */
 static int usbtiny_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                               unsigned int page_size,
-                               unsigned int i, unsigned int n_bytes)
+			       int page_size, int n_bytes)
 {
-  unsigned int maxaddr = i + n_bytes;
+  int i;
   int chunk;        // Size of data to write at once
   int next;
   int function;     // which SPI command to use
@@ -497,7 +500,7 @@ static int usbtiny_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
     delay = m->max_write_delay;
   }
 
-  for (; i < maxaddr; i=next) {
+  for (i=0; i < n_bytes; i=next) {
     // start with the max chunk size
     chunk = PDATA(pgm)->chunk_size;
 
@@ -518,8 +521,20 @@ static int usbtiny_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
 		32 * PDATA(pgm)->sck_period + delay  // each byte gets turned into a
 	                             // 4-byte SPI cmd  usb_out() multiplies
 	                             // this per byte. Then add the cmd-delay
-		) < 0) {
-      return -1;
+		, 1) < 0) {
+      // dirty hack for Trinket's bootloader: do not return the error
+      // Trinket's bootloader must freeze the CPU during flash write
+      // thus the ISR caused by USB might be ignored during that time
+      // this causes USB errors
+      // but experiments have shown that if this error is ignored, then the operation
+      // and subsequent operations still succeeds and can continue to succeed
+      // but the upper layer of avrdude will revert to byte-wise writes
+      // instead of page-wise writes if an error is returned
+      // Trinket's bootloader does not support byte-wise writes
+
+      // return -1;
+
+      usleep(10000); // worst case delay for single page erase plus single page write
     }
 
     next = i + chunk;       // Calculate what address we're at now
@@ -528,6 +543,8 @@ static int usbtiny_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
       // If we're at a page boundary, send the SPI command to flush it.
       avr_write_page(pgm, p, m, (unsigned long) i);
     }
+
+    report_progress( next, n_bytes, NULL );
   }
   return n_bytes;
 }
