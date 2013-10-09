@@ -22,8 +22,13 @@
  * Please see http://www.xs4all.nl/~dicks/avr/usbtiny/
  *        and http://www.ladyada.net/make/usbtinyisp/
  * For example schematics and detailed documentation
- *
- * This variation of usbtiny.c has a dirty hack to support Trinket's bootloader
+ */
+
+/*
+ * This revision of usbtiny.c has some performance fixes for
+ * Adafruit's Trinket/Gemma bootloader
+ * It should be used when the bootloader does not function correctly
+ * Some delays are added, some errors are suppressed, some steps are skipped
  */
 
 #include "ac_cfg.h"
@@ -67,6 +72,8 @@ struct pdata
 
 #define PDATA(pgm) ((struct pdata *)(pgm->cookie))
 
+static char is_trinket = 0; // =1 if Trinket bootloader setting is detected (detection via extra long chip erase time set in avrdude.conf)
+
 // ----------------------------------------------------------------------
 
 static void usbtiny_setup(PROGRAMMER * pgm)
@@ -97,8 +104,14 @@ static int usb_control (PROGRAMMER * pgm,
 			    NULL, 0,              // no data buffer in control messge
 			    USB_TIMEOUT );        // default timeout
   if(nbytes < 0){
-    fprintf(stderr, "\n%s: error: usbtiny_transmit: %s\n", progname, usb_strerror());
-    return -1;
+    if (is_trinket == 0) { // error suppression for Trinket bootloader
+      fprintf(stderr, "\n%s: error: usbtiny_transmit: %s\n", progname, usb_strerror());
+      return -1;
+    }
+    else {
+      usleep(5000); // extra time for Trinket bootloader
+      return 0;
+    }
   }
 
   return nbytes;
@@ -112,12 +125,20 @@ static int usb_in (PROGRAMMER * pgm,
   int nbytes;
   int timeout;
   int i;
+  int tries = 10;
 
   // calculate the amout of time we expect the process to take by
   // figuring the bit-clock time and buffer size and adding to the standard USB timeout.
   timeout = USB_TIMEOUT + (buflen * bitclk) / 1000;
 
-  for (i = 0; i < 10; i++) {
+  if (is_trinket) {
+    tries = 2;
+    // Trinket will probably successfully this command, but fail to reply back
+    // causing an error, so don't retry too many times
+    timeout *= 4;
+  }
+
+  for (i = 0; i < tries; i++) {
     nbytes = usb_control_msg( PDATA(pgm)->usb_handle,
 			      USB_ENDPOINT_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 			      requestid,
@@ -128,18 +149,24 @@ static int usb_in (PROGRAMMER * pgm,
       return nbytes;
     }
     PDATA(pgm)->retries++;
+    if (is_trinket) usleep(500); // Trinket bootloader is sloooow
   }
-  fprintf(stderr, "\n%s: error: usbtiny_receive: %s (expected %d, got %d)\n",
-          progname, usb_strerror(), buflen, nbytes);
-  return -1;
+  if (is_trinket == 0) { // suppress error messages for Trinket bootloader
+    fprintf(stderr, "\n%s: error: usbtiny_receive: %s (expected %d, got %d)\n",
+            progname, usb_strerror(), buflen, nbytes);
+    return -1;
+  }
+  return buflen;
 }
 
 // Report the number of retries, and reset the counter.
 static void check_retries (PROGRAMMER * pgm, const char* operation)
 {
-  if (PDATA(pgm)->retries > 0 && quell_progress < 2) {
-    fprintf(stderr, "%s: %d retries during %s\n", progname,
-           PDATA(pgm)->retries, operation);
+  if (is_trinket == 0) { // suppress error messages for Trinket bootloader
+    if (PDATA(pgm)->retries > 0 && quell_progress < 2) {
+      fprintf(stderr, "%s: %d retries during %s\n", progname,
+             PDATA(pgm)->retries, operation);
+    }
   }
   PDATA(pgm)->retries = 0;
 }
@@ -163,10 +190,9 @@ static int usb_out (PROGRAMMER * pgm,
 			    (char *)buffer, buflen,
 			    timeout);
   if (nbytes != buflen) {
-    if (suppressErr == 0) {
+    if (suppressErr == 0) // suppress error messages for Trinket bootloader
       fprintf(stderr, "\n%s: error: usbtiny_send: %s (expected %d, got %d)\n",
-        progname, usb_strerror(), buflen, nbytes);
-    }
+                      progname, usb_strerror(), buflen, nbytes);
     return -1;
   }
 
@@ -230,7 +256,9 @@ static	int	usbtiny_open(PROGRAMMER* pgm, char* name)
       if (dev->descriptor.idVendor == USBTINY_VENDOR
 	  && dev->descriptor.idProduct == USBTINY_PRODUCT ) {   // found match?
     if(verbose)
-      printf("avrdude: usbdev_open(): Found USBtinyISP, bus:device: %s:%s\n", bus->dirname, dev->filename);
+      fprintf(stderr,
+	      "%s: usbdev_open(): Found USBtinyISP, bus:device: %s:%s\n",
+	      progname, bus->dirname, dev->filename);
     // if -P was given, match device by device name and bus name
     if(name != NULL &&
       (NULL == dev_name ||
@@ -320,38 +348,48 @@ static int usbtiny_initialize (PROGRAMMER *pgm, AVRPART *p )
 {
   unsigned char res[4];        // store the response from usbtinyisp
 
-  // Check for bit-clock and tell the usbtiny to adjust itself
-  if (pgm->bitclock > 0.0) {
-    // -B option specified: convert to valid range for sck_period
-    usbtiny_set_sck_period(pgm, pgm->bitclock);
-  } else {
-    // -B option not specified: use default
+  is_trinket = p->chip_erase_delay > 5000; // Trinket has a extra long chip erase delay setting in avrdude.conf
+  if (is_trinket) { // skip most of the initialization steps because it's the Trinket bootloader
+    fprintf(stderr, "\n\n%s: TRINKET BOOTLOADER SELECTED\n\n", progname);
     PDATA(pgm)->sck_period = SCK_DEFAULT;
-    if	(verbose) {
-      fprintf(stderr, "%s: Using SCK period of %d usec\n",
-	      progname, PDATA(pgm)->sck_period );
-    }
-    if (usb_control(pgm,  USBTINY_POWERUP,
-		    PDATA(pgm)->sck_period, RESET_LOW ) < 0)
-      return -1;
     usbtiny_set_chunk_size(pgm, PDATA(pgm)->sck_period);
+    PDATA(pgm)->chunk_size = 8; // Trinket bootloader is too slow to handle large chunks
   }
+  else {
 
-  // Let the device wake up.
-  usleep(50000);
+    // Check for bit-clock and tell the usbtiny to adjust itself
+    if (pgm->bitclock > 0.0) {
+      // -B option specified: convert to valid range for sck_period
+      usbtiny_set_sck_period(pgm, pgm->bitclock);
+    } else {
+      // -B option not specified: use default
+      PDATA(pgm)->sck_period = SCK_DEFAULT;
+      if	(verbose) {
+        fprintf(stderr, "%s: Using SCK period of %d usec\n",
+          progname, PDATA(pgm)->sck_period );
+      }
+      if (usb_control(pgm,  USBTINY_POWERUP,
+          PDATA(pgm)->sck_period, RESET_LOW ) < 0)
+        return -1;
+      usbtiny_set_chunk_size(pgm, PDATA(pgm)->sck_period);
+    }
 
-  // Attempt to use the underlying avrdude methods to connect (MEME: is this kosher?)
-  if (! usbtiny_avr_op(pgm, p, AVR_OP_PGM_ENABLE, res)) {
-    // no response, RESET and try again
-    if (usb_control(pgm, USBTINY_POWERUP,
-		    PDATA(pgm)->sck_period, RESET_HIGH) < 0 ||
-	usb_control(pgm, USBTINY_POWERUP,
-		    PDATA(pgm)->sck_period, RESET_LOW) < 0)
-      return -1;
+    // Let the device wake up.
     usleep(50000);
-    if	( ! usbtiny_avr_op( pgm, p, AVR_OP_PGM_ENABLE, res)) {
-      // give up
-      return -1;
+
+    // Attempt to use the underlying avrdude methods to connect (MEME: is this kosher?)
+    if (! usbtiny_avr_op(pgm, p, AVR_OP_PGM_ENABLE, res)) {
+      // no response, RESET and try again
+      if (usb_control(pgm, USBTINY_POWERUP,
+          PDATA(pgm)->sck_period, RESET_HIGH) < 0 ||
+          usb_control(pgm, USBTINY_POWERUP,
+          PDATA(pgm)->sck_period, RESET_LOW) < 0)
+        return -1;
+      usleep(50000);
+      if	( ! usbtiny_avr_op( pgm, p, AVR_OP_PGM_ENABLE, res)) {
+        // give up
+        return -1;
+      }
     }
   }
   return 0;
@@ -363,7 +401,8 @@ static void usbtiny_powerdown(PROGRAMMER * pgm)
   if (!PDATA(pgm)->usb_handle) {
     return;                 // wasn't connected in the first place
   }
-  usb_control(pgm, USBTINY_POWERDOWN, 0, 0);      // Send USB control command to device
+  if (is_trinket == 0) usb_control(pgm, USBTINY_POWERDOWN, 0, 0); // Send USB control command to device
+  // waste of time on Trinket bootloader
 }
 
 /* Send a 4-byte SPI command to the USBtinyISP for execution
@@ -379,7 +418,7 @@ static int usbtiny_cmd(PROGRAMMER * pgm, unsigned char cmd[4], unsigned char res
 		   (cmd[1] << 8) | cmd[0],  // convert to 16-bit words
 		   (cmd[3] << 8) | cmd[2],  //  "
 			res, 4, 8 * PDATA(pgm)->sck_period );
-  if (nbytes < 0)
+  if (nbytes < 0 && is_trinket == 0)
     return -1;
   check_retries(pgm, "SPI command");
   if (verbose > 1) {
@@ -387,6 +426,10 @@ static int usbtiny_cmd(PROGRAMMER * pgm, unsigned char cmd[4], unsigned char res
     fprintf(stderr, "CMD: [%02x %02x %02x %02x] [%02x %02x %02x %02x]\n",
 	    cmd[0], cmd[1], cmd[2], cmd[3],
 	    res[0], res[1], res[2], res[3] );
+  }
+  if (is_trinket) {
+    usleep(5000); // Trinket bootloader is slooow
+    return 1;
   }
   return ((nbytes == 4) &&      // should have read 4 bytes
 	  res[2] == cmd[1]);              // AVR's do a delayed-echo thing
@@ -405,9 +448,19 @@ static int usbtiny_chip_erase(PROGRAMMER * pgm, AVRPART * p)
 
   // get the command for erasing this chip and transmit to avrdude
   if (! usbtiny_avr_op( pgm, p, AVR_OP_CHIP_ERASE, res )) {
-    return -1;
+    if (is_trinket == 0)
+      return -1;
   }
   usleep( p->chip_erase_delay );
+  if (is_trinket) {
+    // this delay cannot be too short or too long
+    usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF );
+    usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF );
+    usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF );
+    usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF );
+    // too short and the chip won't have enough time to do the erase
+    // too long and the bootloader will timeout
+  }
 
   // prepare for further instruction
   pgm->initialize(pgm, p);
@@ -427,12 +480,12 @@ static void usbtiny_disable ( PROGRAMMER* pgm ) {}
  *  per byte
 */
 static int usbtiny_paged_load (PROGRAMMER * pgm, AVRPART * p, AVRMEM* m,
-				    int page_size, int n_bytes )
+                               unsigned int page_size,
+                               unsigned int i, unsigned int n_bytes)
 {
-  int i;
+  unsigned int maxaddr = i + n_bytes;
   int chunk;
   int function;
-
 
   // First determine what we're doing
   if (strcmp( m->desc, "flash" ) == 0) {
@@ -441,12 +494,12 @@ static int usbtiny_paged_load (PROGRAMMER * pgm, AVRPART * p, AVRMEM* m,
     function = USBTINY_EEPROM_READ;
   }
 
-  for (i = 0; i < n_bytes; i += chunk) {
+  for (; i < maxaddr; i += chunk) {
     chunk = PDATA(pgm)->chunk_size;         // start with the maximum chunk size possible
 
     // If we want to xmit less than a chunk, thats OK
-    if	(chunk > n_bytes-i)
-      chunk = n_bytes - i;
+    if	(chunk > maxaddr - i)
+      chunk = maxaddr - i;
 
     // Send the chunk of data to the USBtiny with the function we want
     // to perform
@@ -459,11 +512,9 @@ static int usbtiny_paged_load (PROGRAMMER * pgm, AVRPART * p, AVRMEM* m,
 	       32 * PDATA(pgm)->sck_period)  // each byte gets turned into a 4-byte SPI cmd
 	< 0) {
                               // usb_in() multiplies this per byte.
-      return -1;
+      if (is_trinket == 0) return -1; // error suppression for Trinket bootloader
+      usleep(5000); // Trinket bootloader is sloooow
     }
-
-    // Tell avrdude how we're doing to provide user feedback
-    report_progress(i + chunk, n_bytes, NULL );
   }
 
   check_retries(pgm, "read");
@@ -476,9 +527,10 @@ static int usbtiny_paged_load (PROGRAMMER * pgm, AVRPART * p, AVRMEM* m,
  *  per byte.
 */
 static int usbtiny_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-			       int page_size, int n_bytes)
+                               unsigned int page_size,
+                               unsigned int i, unsigned int n_bytes)
 {
-  int i;
+  unsigned int maxaddr = i + n_bytes;
   int chunk;        // Size of data to write at once
   int next;
   int function;     // which SPI command to use
@@ -500,7 +552,7 @@ static int usbtiny_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
     delay = m->max_write_delay;
   }
 
-  for (i=0; i < n_bytes; i=next) {
+  for (; i < maxaddr; i=next) {
     // start with the max chunk size
     chunk = PDATA(pgm)->chunk_size;
 
@@ -508,9 +560,13 @@ static int usbtiny_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
     if (m->paged && chunk > page_size)
       chunk = page_size;
 
+    // Trinket seems to freak out if it receives more than 8 bytes per control transfer
+    if (is_trinket && chunk > 8)
+      chunk = 8;
+
     // if there's less data remaining than one chunk
-    if (chunk > n_bytes-i)
-      chunk = n_bytes - i;
+    if (chunk > maxaddr - i)
+      chunk = maxaddr - i;
 
     if (usb_out(pgm,
 		function,       // Flash or EEPROM
@@ -521,30 +577,21 @@ static int usbtiny_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
 		32 * PDATA(pgm)->sck_period + delay  // each byte gets turned into a
 	                             // 4-byte SPI cmd  usb_out() multiplies
 	                             // this per byte. Then add the cmd-delay
-		, 1) < 0) {
-      // dirty hack for Trinket's bootloader: do not return the error
-      // Trinket's bootloader must freeze the CPU during flash write
-      // thus the ISR caused by USB might be ignored during that time
-      // this causes USB errors
-      // but experiments have shown that if this error is ignored, then the operation
-      // and subsequent operations still succeeds and can continue to succeed
-      // but the upper layer of avrdude will revert to byte-wise writes
-      // instead of page-wise writes if an error is returned
-      // Trinket's bootloader does not support byte-wise writes
-
-      // return -1;
-
-      usleep(10000); // worst case delay for single page erase plus single page write
+		, is_trinket) < 0) {
+      if (is_trinket == 0) return -1;
+      else usleep(10000); // something went wrong with the Trinket bootloader, but it most likely succeeded and simply failed to reply
+      // so just give it a delay and hope for the best
     }
+
+    if (is_trinket) usleep(200); // give Trinket bootloader some extra time to think, since it's a bit slow
 
     next = i + chunk;       // Calculate what address we're at now
     if (m->paged
 	&& ((next % page_size) == 0 || next == n_bytes) ) {
       // If we're at a page boundary, send the SPI command to flush it.
       avr_write_page(pgm, p, m, (unsigned long) i);
+      if (is_trinket) usleep(10000); // extra delay for flash page write
     }
-
-    report_progress( next, n_bytes, NULL );
   }
   return n_bytes;
 }

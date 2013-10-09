@@ -1,0 +1,3758 @@
+Terminals which are not used
+
+   K_EEPROM
+   K_FLASH
+   K_LOADPAGE
+   K_READMEM
+   K_HVCMDEXEDELAY
+   TKN_ID
+
+
+Grammar
+
+    0 $accept: configuration $end
+
+    1 configuration: /* empty */
+    2              | config
+
+    3 config: def
+    4       | config def
+
+    5 def: prog_def TKN_SEMI
+    6    | part_def TKN_SEMI
+    7    | K_DEFAULT_PROGRAMMER TKN_EQUAL TKN_STRING TKN_SEMI
+    8    | K_DEFAULT_PARALLEL TKN_EQUAL TKN_STRING TKN_SEMI
+    9    | K_DEFAULT_SERIAL TKN_EQUAL TKN_STRING TKN_SEMI
+   10    | K_DEFAULT_BITCLOCK TKN_EQUAL TKN_NUMBER TKN_SEMI
+
+   11 @1: /* empty */
+
+   12 prog_def: K_PROGRAMMER @1 prog_parms
+
+   13 @2: /* empty */
+
+   14 part_def: K_PART @2 part_parms
+
+   15 string_list: TKN_STRING
+   16            | string_list TKN_COMMA TKN_STRING
+
+   17 num_list: TKN_NUMBER
+   18         | num_list TKN_COMMA TKN_NUMBER
+
+   19 prog_parms: prog_parm TKN_SEMI
+   20           | prog_parms prog_parm TKN_SEMI
+
+   21 prog_parm: K_ID TKN_EQUAL string_list
+   22          | K_TYPE TKN_EQUAL K_PAR
+   23          | K_TYPE TKN_EQUAL K_SERBB
+   24          | K_TYPE TKN_EQUAL K_STK500
+   25          | K_TYPE TKN_EQUAL K_STK500V2
+   26          | K_TYPE TKN_EQUAL K_WIRING
+   27          | K_TYPE TKN_EQUAL K_STK500HVSP
+   28          | K_TYPE TKN_EQUAL K_STK500PP
+   29          | K_TYPE TKN_EQUAL K_STK500GENERIC
+   30          | K_TYPE TKN_EQUAL K_ARDUINO
+   31          | K_TYPE TKN_EQUAL K_AVRFTDI
+   32          | K_TYPE TKN_EQUAL K_BUSPIRATE
+   33          | K_TYPE TKN_EQUAL K_STK600
+   34          | K_TYPE TKN_EQUAL K_STK600HVSP
+   35          | K_TYPE TKN_EQUAL K_STK600PP
+   36          | K_TYPE TKN_EQUAL K_AVR910
+   37          | K_TYPE TKN_EQUAL K_USBASP
+   38          | K_TYPE TKN_EQUAL K_USBTINY
+   39          | K_TYPE TKN_EQUAL K_BUTTERFLY
+   40          | K_TYPE TKN_EQUAL K_BUTTERFLY_MK
+   41          | K_TYPE TKN_EQUAL K_JTAG_MKI
+   42          | K_TYPE TKN_EQUAL K_JTAG_MKII
+   43          | K_TYPE TKN_EQUAL K_JTAG_MKII_AVR32
+   44          | K_TYPE TKN_EQUAL K_JTAG_MKII_DW
+   45          | K_TYPE TKN_EQUAL K_JTAG_MKII_ISP
+   46          | K_TYPE TKN_EQUAL K_JTAG_MKII_PDI
+   47          | K_TYPE TKN_EQUAL K_DRAGON_DW
+   48          | K_TYPE TKN_EQUAL K_DRAGON_HVSP
+   49          | K_TYPE TKN_EQUAL K_DRAGON_ISP
+   50          | K_TYPE TKN_EQUAL K_DRAGON_JTAG
+   51          | K_TYPE TKN_EQUAL K_DRAGON_PDI
+   52          | K_TYPE TKN_EQUAL K_DRAGON_PP
+   53          | K_DESC TKN_EQUAL TKN_STRING
+   54          | K_VCC TKN_EQUAL num_list
+   55          | K_BUFF TKN_EQUAL num_list
+   56          | K_USBDEV TKN_EQUAL TKN_STRING
+   57          | K_USBVID TKN_EQUAL TKN_NUMBER
+   58          | K_USBPID TKN_EQUAL TKN_NUMBER
+   59          | K_USBSN TKN_EQUAL TKN_STRING
+   60          | K_USBVENDOR TKN_EQUAL TKN_STRING
+   61          | K_USBPRODUCT TKN_EQUAL TKN_STRING
+   62          | K_BAUDRATE TKN_EQUAL TKN_NUMBER
+   63          | K_RESET TKN_EQUAL TKN_NUMBER
+   64          | K_SCK TKN_EQUAL TKN_NUMBER
+   65          | K_MOSI TKN_EQUAL TKN_NUMBER
+   66          | K_MISO TKN_EQUAL TKN_NUMBER
+   67          | K_ERRLED TKN_EQUAL TKN_NUMBER
+   68          | K_RDYLED TKN_EQUAL TKN_NUMBER
+   69          | K_PGMLED TKN_EQUAL TKN_NUMBER
+   70          | K_VFYLED TKN_EQUAL TKN_NUMBER
+   71          | K_RESET TKN_EQUAL TKN_TILDE TKN_NUMBER
+   72          | K_SCK TKN_EQUAL TKN_TILDE TKN_NUMBER
+   73          | K_MOSI TKN_EQUAL TKN_TILDE TKN_NUMBER
+   74          | K_MISO TKN_EQUAL TKN_TILDE TKN_NUMBER
+   75          | K_ERRLED TKN_EQUAL TKN_TILDE TKN_NUMBER
+   76          | K_RDYLED TKN_EQUAL TKN_TILDE TKN_NUMBER
+   77          | K_PGMLED TKN_EQUAL TKN_TILDE TKN_NUMBER
+   78          | K_VFYLED TKN_EQUAL TKN_TILDE TKN_NUMBER
+
+   79 opcode: K_READ
+   80       | K_WRITE
+   81       | K_READ_LO
+   82       | K_READ_HI
+   83       | K_WRITE_LO
+   84       | K_WRITE_HI
+   85       | K_LOADPAGE_LO
+   86       | K_LOADPAGE_HI
+   87       | K_LOAD_EXT_ADDR
+   88       | K_WRITEPAGE
+   89       | K_CHIP_ERASE
+   90       | K_PGM_ENABLE
+
+   91 part_parms: part_parm TKN_SEMI
+   92           | part_parms part_parm TKN_SEMI
+
+   93 reset_disposition: K_DEDICATED
+   94                  | K_IO
+
+   95 parallel_modes: yesno
+   96               | K_PSEUDO
+
+   97 retry_lines: K_RESET
+   98            | K_SCK
+
+   99 part_parm: K_ID TKN_EQUAL TKN_STRING
+  100          | K_DESC TKN_EQUAL TKN_STRING
+  101          | K_DEVICECODE TKN_EQUAL TKN_NUMBER
+  102          | K_STK500_DEVCODE TKN_EQUAL TKN_NUMBER
+  103          | K_AVR910_DEVCODE TKN_EQUAL TKN_NUMBER
+  104          | K_SIGNATURE TKN_EQUAL TKN_NUMBER TKN_NUMBER TKN_NUMBER
+  105          | K_PP_CONTROLSTACK TKN_EQUAL num_list
+  106          | K_HVSP_CONTROLSTACK TKN_EQUAL num_list
+  107          | K_FLASH_INSTR TKN_EQUAL num_list
+  108          | K_EEPROM_INSTR TKN_EQUAL num_list
+  109          | K_CHIP_ERASE_DELAY TKN_EQUAL TKN_NUMBER
+  110          | K_PAGEL TKN_EQUAL TKN_NUMBER
+  111          | K_BS2 TKN_EQUAL TKN_NUMBER
+  112          | K_RESET TKN_EQUAL reset_disposition
+  113          | K_TIMEOUT TKN_EQUAL TKN_NUMBER
+  114          | K_STABDELAY TKN_EQUAL TKN_NUMBER
+  115          | K_CMDEXEDELAY TKN_EQUAL TKN_NUMBER
+  116          | K_HVSPCMDEXEDELAY TKN_EQUAL TKN_NUMBER
+  117          | K_SYNCHLOOPS TKN_EQUAL TKN_NUMBER
+  118          | K_BYTEDELAY TKN_EQUAL TKN_NUMBER
+  119          | K_POLLVALUE TKN_EQUAL TKN_NUMBER
+  120          | K_POLLINDEX TKN_EQUAL TKN_NUMBER
+  121          | K_PREDELAY TKN_EQUAL TKN_NUMBER
+  122          | K_POSTDELAY TKN_EQUAL TKN_NUMBER
+  123          | K_POLLMETHOD TKN_EQUAL TKN_NUMBER
+  124          | K_HVENTERSTABDELAY TKN_EQUAL TKN_NUMBER
+  125          | K_PROGMODEDELAY TKN_EQUAL TKN_NUMBER
+  126          | K_LATCHCYCLES TKN_EQUAL TKN_NUMBER
+  127          | K_TOGGLEVTG TKN_EQUAL TKN_NUMBER
+  128          | K_POWEROFFDELAY TKN_EQUAL TKN_NUMBER
+  129          | K_RESETDELAYMS TKN_EQUAL TKN_NUMBER
+  130          | K_RESETDELAYUS TKN_EQUAL TKN_NUMBER
+  131          | K_HVLEAVESTABDELAY TKN_EQUAL TKN_NUMBER
+  132          | K_RESETDELAY TKN_EQUAL TKN_NUMBER
+  133          | K_CHIPERASEPULSEWIDTH TKN_EQUAL TKN_NUMBER
+  134          | K_CHIPERASEPOLLTIMEOUT TKN_EQUAL TKN_NUMBER
+  135          | K_CHIPERASETIME TKN_EQUAL TKN_NUMBER
+  136          | K_PROGRAMFUSEPULSEWIDTH TKN_EQUAL TKN_NUMBER
+  137          | K_PROGRAMFUSEPOLLTIMEOUT TKN_EQUAL TKN_NUMBER
+  138          | K_PROGRAMLOCKPULSEWIDTH TKN_EQUAL TKN_NUMBER
+  139          | K_PROGRAMLOCKPOLLTIMEOUT TKN_EQUAL TKN_NUMBER
+  140          | K_SYNCHCYCLES TKN_EQUAL TKN_NUMBER
+  141          | K_HAS_JTAG TKN_EQUAL yesno
+  142          | K_HAS_DW TKN_EQUAL yesno
+  143          | K_HAS_PDI TKN_EQUAL yesno
+  144          | K_HAS_TPI TKN_EQUAL yesno
+  145          | K_IS_AVR32 TKN_EQUAL yesno
+  146          | K_ALLOWFULLPAGEBITSTREAM TKN_EQUAL yesno
+  147          | K_ENABLEPAGEPROGRAMMING TKN_EQUAL yesno
+  148          | K_IDR TKN_EQUAL TKN_NUMBER
+  149          | K_RAMPZ TKN_EQUAL TKN_NUMBER
+  150          | K_SPMCR TKN_EQUAL TKN_NUMBER
+  151          | K_EECR TKN_EQUAL TKN_NUMBER
+  152          | K_NVM_BASE TKN_EQUAL TKN_NUMBER
+  153          | K_SERIAL TKN_EQUAL yesno
+  154          | K_PARALLEL TKN_EQUAL parallel_modes
+  155          | K_RETRY_PULSE TKN_EQUAL retry_lines
+
+  156 @3: /* empty */
+
+  157 part_parm: K_MEMORY TKN_STRING @3 mem_specs
+  158          | opcode TKN_EQUAL string_list
+
+  159 yesno: K_YES
+  160      | K_NO
+
+  161 mem_specs: mem_spec TKN_SEMI
+  162          | mem_specs mem_spec TKN_SEMI
+
+  163 mem_spec: K_PAGED TKN_EQUAL yesno
+  164         | K_SIZE TKN_EQUAL TKN_NUMBER
+  165         | K_PAGE_SIZE TKN_EQUAL TKN_NUMBER
+  166         | K_NUM_PAGES TKN_EQUAL TKN_NUMBER
+  167         | K_OFFSET TKN_EQUAL TKN_NUMBER
+  168         | K_MIN_WRITE_DELAY TKN_EQUAL TKN_NUMBER
+  169         | K_MAX_WRITE_DELAY TKN_EQUAL TKN_NUMBER
+  170         | K_PWROFF_AFTER_WRITE TKN_EQUAL yesno
+  171         | K_READBACK_P1 TKN_EQUAL TKN_NUMBER
+  172         | K_READBACK_P2 TKN_EQUAL TKN_NUMBER
+  173         | K_MODE TKN_EQUAL TKN_NUMBER
+  174         | K_DELAY TKN_EQUAL TKN_NUMBER
+  175         | K_BLOCKSIZE TKN_EQUAL TKN_NUMBER
+  176         | K_READSIZE TKN_EQUAL TKN_NUMBER
+  177         | K_POLLINDEX TKN_EQUAL TKN_NUMBER
+  178         | opcode TKN_EQUAL string_list
+
+
+Terminals, with rules where they appear
+
+$end (0) 0
+error (256)
+K_READ (258) 79
+K_WRITE (259) 80
+K_READ_LO (260) 81
+K_READ_HI (261) 82
+K_WRITE_LO (262) 83
+K_WRITE_HI (263) 84
+K_LOADPAGE_LO (264) 85
+K_LOADPAGE_HI (265) 86
+K_LOAD_EXT_ADDR (266) 87
+K_WRITEPAGE (267) 88
+K_CHIP_ERASE (268) 89
+K_PGM_ENABLE (269) 90
+K_MEMORY (270) 157
+K_PAGE_SIZE (271) 165
+K_PAGED (272) 163
+K_ARDUINO (273) 30
+K_AVRFTDI (274) 31
+K_BAUDRATE (275) 62
+K_BS2 (276) 111
+K_BUFF (277) 55
+K_BUSPIRATE (278) 32
+K_CHIP_ERASE_DELAY (279) 109
+K_DEDICATED (280) 93
+K_DEFAULT_PARALLEL (281) 8
+K_DEFAULT_PROGRAMMER (282) 7
+K_DEFAULT_SERIAL (283) 9
+K_DEFAULT_BITCLOCK (284) 10
+K_DESC (285) 53 100
+K_DEVICECODE (286) 101
+K_DRAGON_DW (287) 47
+K_DRAGON_HVSP (288) 48
+K_DRAGON_ISP (289) 49
+K_DRAGON_JTAG (290) 50
+K_DRAGON_PDI (291) 51
+K_DRAGON_PP (292) 52
+K_STK500_DEVCODE (293) 102
+K_AVR910_DEVCODE (294) 103
+K_EEPROM (295)
+K_ERRLED (296) 67 75
+K_FLASH (297)
+K_ID (298) 21 99
+K_IO (299) 94
+K_JTAG_MKI (300) 41
+K_JTAG_MKII (301) 42
+K_JTAG_MKII_AVR32 (302) 43
+K_JTAG_MKII_DW (303) 44
+K_JTAG_MKII_ISP (304) 45
+K_JTAG_MKII_PDI (305) 46
+K_LOADPAGE (306)
+K_MAX_WRITE_DELAY (307) 169
+K_MIN_WRITE_DELAY (308) 168
+K_MISO (309) 66 74
+K_MOSI (310) 65 73
+K_NUM_PAGES (311) 166
+K_NVM_BASE (312) 152
+K_OFFSET (313) 167
+K_PAGEL (314) 110
+K_PAR (315) 22
+K_PARALLEL (316) 154
+K_PART (317) 14
+K_PGMLED (318) 69 77
+K_PROGRAMMER (319) 12
+K_PSEUDO (320) 96
+K_PWROFF_AFTER_WRITE (321) 170
+K_RDYLED (322) 68 76
+K_READBACK_P1 (323) 171
+K_READBACK_P2 (324) 172
+K_READMEM (325)
+K_RESET (326) 63 71 97 112
+K_RETRY_PULSE (327) 155
+K_SERBB (328) 23
+K_SERIAL (329) 153
+K_SCK (330) 64 72 98
+K_SIGNATURE (331) 104
+K_SIZE (332) 164
+K_STK500 (333) 24
+K_STK500HVSP (334) 27
+K_STK500PP (335) 28
+K_STK500V2 (336) 25
+K_STK500GENERIC (337) 29
+K_STK600 (338) 33
+K_STK600HVSP (339) 34
+K_STK600PP (340) 35
+K_AVR910 (341) 36
+K_USBASP (342) 37
+K_USBDEV (343) 56
+K_USBSN (344) 59
+K_USBTINY (345) 38
+K_USBPID (346) 58
+K_USBPRODUCT (347) 61
+K_USBVENDOR (348) 60
+K_USBVID (349) 57
+K_BUTTERFLY (350) 39
+K_BUTTERFLY_MK (351) 40
+K_TYPE (352) 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39
+    40 41 42 43 44 45 46 47 48 49 50 51 52
+K_VCC (353) 54
+K_VFYLED (354) 70 78
+K_WIRING (355) 26
+K_NO (356) 160
+K_YES (357) 159
+K_TIMEOUT (358) 113
+K_STABDELAY (359) 114
+K_CMDEXEDELAY (360) 115
+K_HVSPCMDEXEDELAY (361) 116
+K_SYNCHLOOPS (362) 117
+K_BYTEDELAY (363) 118
+K_POLLVALUE (364) 119
+K_POLLINDEX (365) 120 177
+K_PREDELAY (366) 121
+K_POSTDELAY (367) 122
+K_POLLMETHOD (368) 123
+K_MODE (369) 173
+K_DELAY (370) 174
+K_BLOCKSIZE (371) 175
+K_READSIZE (372) 176
+K_HVENTERSTABDELAY (373) 124
+K_PROGMODEDELAY (374) 125
+K_LATCHCYCLES (375) 126
+K_TOGGLEVTG (376) 127
+K_POWEROFFDELAY (377) 128
+K_RESETDELAYMS (378) 129
+K_RESETDELAYUS (379) 130
+K_HVLEAVESTABDELAY (380) 131
+K_RESETDELAY (381) 132
+K_SYNCHCYCLES (382) 140
+K_HVCMDEXEDELAY (383)
+K_CHIPERASEPULSEWIDTH (384) 133
+K_CHIPERASEPOLLTIMEOUT (385) 134
+K_CHIPERASETIME (386) 135
+K_PROGRAMFUSEPULSEWIDTH (387) 136
+K_PROGRAMFUSEPOLLTIMEOUT (388) 137
+K_PROGRAMLOCKPULSEWIDTH (389) 138
+K_PROGRAMLOCKPOLLTIMEOUT (390) 139
+K_PP_CONTROLSTACK (391) 105
+K_HVSP_CONTROLSTACK (392) 106
+K_ALLOWFULLPAGEBITSTREAM (393) 146
+K_ENABLEPAGEPROGRAMMING (394) 147
+K_HAS_JTAG (395) 141
+K_HAS_DW (396) 142
+K_HAS_PDI (397) 143
+K_HAS_TPI (398) 144
+K_IDR (399) 148
+K_IS_AVR32 (400) 145
+K_RAMPZ (401) 149
+K_SPMCR (402) 150
+K_EECR (403) 151
+K_FLASH_INSTR (404) 107
+K_EEPROM_INSTR (405) 108
+TKN_COMMA (406) 16 18
+TKN_EQUAL (407) 7 8 9 10 21 22 23 24 25 26 27 28 29 30 31 32 33 34
+    35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55
+    56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76
+    77 78 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113
+    114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129
+    130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145
+    146 147 148 149 150 151 152 153 154 155 158 163 164 165 166 167
+    168 169 170 171 172 173 174 175 176 177 178
+TKN_SEMI (408) 5 6 7 8 9 10 19 20 91 92 161 162
+TKN_TILDE (409) 71 72 73 74 75 76 77 78
+TKN_NUMBER (410) 10 17 18 57 58 62 63 64 65 66 67 68 69 70 71 72 73
+    74 75 76 77 78 101 102 103 104 109 110 111 113 114 115 116 117
+    118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133
+    134 135 136 137 138 139 140 148 149 150 151 152 164 165 166 167
+    168 169 171 172 173 174 175 176 177
+TKN_STRING (411) 7 8 9 15 16 53 56 59 60 61 99 100 157
+TKN_ID (412)
+
+
+Nonterminals, with rules where they appear
+
+$accept (158)
+    on left: 0
+configuration (159)
+    on left: 1 2, on right: 0
+config (160)
+    on left: 3 4, on right: 2 4
+def (161)
+    on left: 5 6 7 8 9 10, on right: 3 4
+prog_def (162)
+    on left: 12, on right: 5
+@1 (163)
+    on left: 11, on right: 12
+part_def (164)
+    on left: 14, on right: 6
+@2 (165)
+    on left: 13, on right: 14
+string_list (166)
+    on left: 15 16, on right: 16 21 158 178
+num_list (167)
+    on left: 17 18, on right: 18 54 55 105 106 107 108
+prog_parms (168)
+    on left: 19 20, on right: 12 20
+prog_parm (169)
+    on left: 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38
+    39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59
+    60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78,
+    on right: 19 20
+opcode (170)
+    on left: 79 80 81 82 83 84 85 86 87 88 89 90, on right: 158 178
+part_parms (171)
+    on left: 91 92, on right: 14 92
+reset_disposition (172)
+    on left: 93 94, on right: 112
+parallel_modes (173)
+    on left: 95 96, on right: 154
+retry_lines (174)
+    on left: 97 98, on right: 155
+part_parm (175)
+    on left: 99 100 101 102 103 104 105 106 107 108 109 110 111 112
+    113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128
+    129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144
+    145 146 147 148 149 150 151 152 153 154 155 157 158,
+    on right: 91 92
+@3 (176)
+    on left: 156, on right: 157
+yesno (177)
+    on left: 159 160, on right: 95 141 142 143 144 145 146 147 153
+    163 170
+mem_specs (178)
+    on left: 161 162, on right: 157 162
+mem_spec (179)
+    on left: 163 164 165 166 167 168 169 170 171 172 173 174 175 176
+    177 178, on right: 161 162
+
+
+state 0
+
+    0 $accept: . configuration $end
+
+    K_DEFAULT_PARALLEL    shift, and go to state 1
+    K_DEFAULT_PROGRAMMER  shift, and go to state 2
+    K_DEFAULT_SERIAL      shift, and go to state 3
+    K_DEFAULT_BITCLOCK    shift, and go to state 4
+    K_PART                shift, and go to state 5
+    K_PROGRAMMER          shift, and go to state 6
+
+    $default  reduce using rule 1 (configuration)
+
+    configuration  go to state 7
+    config         go to state 8
+    def            go to state 9
+    prog_def       go to state 10
+    part_def       go to state 11
+
+
+state 1
+
+    8 def: K_DEFAULT_PARALLEL . TKN_EQUAL TKN_STRING TKN_SEMI
+
+    TKN_EQUAL  shift, and go to state 12
+
+
+state 2
+
+    7 def: K_DEFAULT_PROGRAMMER . TKN_EQUAL TKN_STRING TKN_SEMI
+
+    TKN_EQUAL  shift, and go to state 13
+
+
+state 3
+
+    9 def: K_DEFAULT_SERIAL . TKN_EQUAL TKN_STRING TKN_SEMI
+
+    TKN_EQUAL  shift, and go to state 14
+
+
+state 4
+
+   10 def: K_DEFAULT_BITCLOCK . TKN_EQUAL TKN_NUMBER TKN_SEMI
+
+    TKN_EQUAL  shift, and go to state 15
+
+
+state 5
+
+   14 part_def: K_PART . @2 part_parms
+
+    $default  reduce using rule 13 (@2)
+
+    @2  go to state 16
+
+
+state 6
+
+   12 prog_def: K_PROGRAMMER . @1 prog_parms
+
+    $default  reduce using rule 11 (@1)
+
+    @1  go to state 17
+
+
+state 7
+
+    0 $accept: configuration . $end
+
+    $end  shift, and go to state 18
+
+
+state 8
+
+    2 configuration: config .
+    4 config: config . def
+
+    K_DEFAULT_PARALLEL    shift, and go to state 1
+    K_DEFAULT_PROGRAMMER  shift, and go to state 2
+    K_DEFAULT_SERIAL      shift, and go to state 3
+    K_DEFAULT_BITCLOCK    shift, and go to state 4
+    K_PART                shift, and go to state 5
+    K_PROGRAMMER          shift, and go to state 6
+
+    $default  reduce using rule 2 (configuration)
+
+    def       go to state 19
+    prog_def  go to state 10
+    part_def  go to state 11
+
+
+state 9
+
+    3 config: def .
+
+    $default  reduce using rule 3 (config)
+
+
+state 10
+
+    5 def: prog_def . TKN_SEMI
+
+    TKN_SEMI  shift, and go to state 20
+
+
+state 11
+
+    6 def: part_def . TKN_SEMI
+
+    TKN_SEMI  shift, and go to state 21
+
+
+state 12
+
+    8 def: K_DEFAULT_PARALLEL TKN_EQUAL . TKN_STRING TKN_SEMI
+
+    TKN_STRING  shift, and go to state 22
+
+
+state 13
+
+    7 def: K_DEFAULT_PROGRAMMER TKN_EQUAL . TKN_STRING TKN_SEMI
+
+    TKN_STRING  shift, and go to state 23
+
+
+state 14
+
+    9 def: K_DEFAULT_SERIAL TKN_EQUAL . TKN_STRING TKN_SEMI
+
+    TKN_STRING  shift, and go to state 24
+
+
+state 15
+
+   10 def: K_DEFAULT_BITCLOCK TKN_EQUAL . TKN_NUMBER TKN_SEMI
+
+    TKN_NUMBER  shift, and go to state 25
+
+
+state 16
+
+   14 part_def: K_PART @2 . part_parms
+
+    K_READ                    shift, and go to state 26
+    K_WRITE                   shift, and go to state 27
+    K_READ_LO                 shift, and go to state 28
+    K_READ_HI                 shift, and go to state 29
+    K_WRITE_LO                shift, and go to state 30
+    K_WRITE_HI                shift, and go to state 31
+    K_LOADPAGE_LO             shift, and go to state 32
+    K_LOADPAGE_HI             shift, and go to state 33
+    K_LOAD_EXT_ADDR           shift, and go to state 34
+    K_WRITEPAGE               shift, and go to state 35
+    K_CHIP_ERASE              shift, and go to state 36
+    K_PGM_ENABLE              shift, and go to state 37
+    K_MEMORY                  shift, and go to state 38
+    K_BS2                     shift, and go to state 39
+    K_CHIP_ERASE_DELAY        shift, and go to state 40
+    K_DESC                    shift, and go to state 41
+    K_DEVICECODE              shift, and go to state 42
+    K_STK500_DEVCODE          shift, and go to state 43
+    K_AVR910_DEVCODE          shift, and go to state 44
+    K_ID                      shift, and go to state 45
+    K_NVM_BASE                shift, and go to state 46
+    K_PAGEL                   shift, and go to state 47
+    K_PARALLEL                shift, and go to state 48
+    K_RESET                   shift, and go to state 49
+    K_RETRY_PULSE             shift, and go to state 50
+    K_SERIAL                  shift, and go to state 51
+    K_SIGNATURE               shift, and go to state 52
+    K_TIMEOUT                 shift, and go to state 53
+    K_STABDELAY               shift, and go to state 54
+    K_CMDEXEDELAY             shift, and go to state 55
+    K_HVSPCMDEXEDELAY         shift, and go to state 56
+    K_SYNCHLOOPS              shift, and go to state 57
+    K_BYTEDELAY               shift, and go to state 58
+    K_POLLVALUE               shift, and go to state 59
+    K_POLLINDEX               shift, and go to state 60
+    K_PREDELAY                shift, and go to state 61
+    K_POSTDELAY               shift, and go to state 62
+    K_POLLMETHOD              shift, and go to state 63
+    K_HVENTERSTABDELAY        shift, and go to state 64
+    K_PROGMODEDELAY           shift, and go to state 65
+    K_LATCHCYCLES             shift, and go to state 66
+    K_TOGGLEVTG               shift, and go to state 67
+    K_POWEROFFDELAY           shift, and go to state 68
+    K_RESETDELAYMS            shift, and go to state 69
+    K_RESETDELAYUS            shift, and go to state 70
+    K_HVLEAVESTABDELAY        shift, and go to state 71
+    K_RESETDELAY              shift, and go to state 72
+    K_SYNCHCYCLES             shift, and go to state 73
+    K_CHIPERASEPULSEWIDTH     shift, and go to state 74
+    K_CHIPERASEPOLLTIMEOUT    shift, and go to state 75
+    K_CHIPERASETIME           shift, and go to state 76
+    K_PROGRAMFUSEPULSEWIDTH   shift, and go to state 77
+    K_PROGRAMFUSEPOLLTIMEOUT  shift, and go to state 78
+    K_PROGRAMLOCKPULSEWIDTH   shift, and go to state 79
+    K_PROGRAMLOCKPOLLTIMEOUT  shift, and go to state 80
+    K_PP_CONTROLSTACK         shift, and go to state 81
+    K_HVSP_CONTROLSTACK       shift, and go to state 82
+    K_ALLOWFULLPAGEBITSTREAM  shift, and go to state 83
+    K_ENABLEPAGEPROGRAMMING   shift, and go to state 84
+    K_HAS_JTAG                shift, and go to state 85
+    K_HAS_DW                  shift, and go to state 86
+    K_HAS_PDI                 shift, and go to state 87
+    K_HAS_TPI                 shift, and go to state 88
+    K_IDR                     shift, and go to state 89
+    K_IS_AVR32                shift, and go to state 90
+    K_RAMPZ                   shift, and go to state 91
+    K_SPMCR                   shift, and go to state 92
+    K_EECR                    shift, and go to state 93
+    K_FLASH_INSTR             shift, and go to state 94
+    K_EEPROM_INSTR            shift, and go to state 95
+
+    opcode      go to state 96
+    part_parms  go to state 97
+    part_parm   go to state 98
+
+
+state 17
+
+   12 prog_def: K_PROGRAMMER @1 . prog_parms
+
+    K_BAUDRATE    shift, and go to state 99
+    K_BUFF        shift, and go to state 100
+    K_DESC        shift, and go to state 101
+    K_ERRLED      shift, and go to state 102
+    K_ID          shift, and go to state 103
+    K_MISO        shift, and go to state 104
+    K_MOSI        shift, and go to state 105
+    K_PGMLED      shift, and go to state 106
+    K_RDYLED      shift, and go to state 107
+    K_RESET       shift, and go to state 108
+    K_SCK         shift, and go to state 109
+    K_USBDEV      shift, and go to state 110
+    K_USBSN       shift, and go to state 111
+    K_USBPID      shift, and go to state 112
+    K_USBPRODUCT  shift, and go to state 113
+    K_USBVENDOR   shift, and go to state 114
+    K_USBVID      shift, and go to state 115
+    K_TYPE        shift, and go to state 116
+    K_VCC         shift, and go to state 117
+    K_VFYLED      shift, and go to state 118
+
+    prog_parms  go to state 119
+    prog_parm   go to state 120
+
+
+state 18
+
+    0 $accept: configuration $end .
+
+    $default  accept
+
+
+state 19
+
+    4 config: config def .
+
+    $default  reduce using rule 4 (config)
+
+
+state 20
+
+    5 def: prog_def TKN_SEMI .
+
+    $default  reduce using rule 5 (def)
+
+
+state 21
+
+    6 def: part_def TKN_SEMI .
+
+    $default  reduce using rule 6 (def)
+
+
+state 22
+
+    8 def: K_DEFAULT_PARALLEL TKN_EQUAL TKN_STRING . TKN_SEMI
+
+    TKN_SEMI  shift, and go to state 121
+
+
+state 23
+
+    7 def: K_DEFAULT_PROGRAMMER TKN_EQUAL TKN_STRING . TKN_SEMI
+
+    TKN_SEMI  shift, and go to state 122
+
+
+state 24
+
+    9 def: K_DEFAULT_SERIAL TKN_EQUAL TKN_STRING . TKN_SEMI
+
+    TKN_SEMI  shift, and go to state 123
+
+
+state 25
+
+   10 def: K_DEFAULT_BITCLOCK TKN_EQUAL TKN_NUMBER . TKN_SEMI
+
+    TKN_SEMI  shift, and go to state 124
+
+
+state 26
+
+   79 opcode: K_READ .
+
+    $default  reduce using rule 79 (opcode)
+
+
+state 27
+
+   80 opcode: K_WRITE .
+
+    $default  reduce using rule 80 (opcode)
+
+
+state 28
+
+   81 opcode: K_READ_LO .
+
+    $default  reduce using rule 81 (opcode)
+
+
+state 29
+
+   82 opcode: K_READ_HI .
+
+    $default  reduce using rule 82 (opcode)
+
+
+state 30
+
+   83 opcode: K_WRITE_LO .
+
+    $default  reduce using rule 83 (opcode)
+
+
+state 31
+
+   84 opcode: K_WRITE_HI .
+
+    $default  reduce using rule 84 (opcode)
+
+
+state 32
+
+   85 opcode: K_LOADPAGE_LO .
+
+    $default  reduce using rule 85 (opcode)
+
+
+state 33
+
+   86 opcode: K_LOADPAGE_HI .
+
+    $default  reduce using rule 86 (opcode)
+
+
+state 34
+
+   87 opcode: K_LOAD_EXT_ADDR .
+
+    $default  reduce using rule 87 (opcode)
+
+
+state 35
+
+   88 opcode: K_WRITEPAGE .
+
+    $default  reduce using rule 88 (opcode)
+
+
+state 36
+
+   89 opcode: K_CHIP_ERASE .
+
+    $default  reduce using rule 89 (opcode)
+
+
+state 37
+
+   90 opcode: K_PGM_ENABLE .
+
+    $default  reduce using rule 90 (opcode)
+
+
+state 38
+
+  157 part_parm: K_MEMORY . TKN_STRING @3 mem_specs
+
+    TKN_STRING  shift, and go to state 125
+
+
+state 39
+
+  111 part_parm: K_BS2 . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 126
+
+
+state 40
+
+  109 part_parm: K_CHIP_ERASE_DELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 127
+
+
+state 41
+
+  100 part_parm: K_DESC . TKN_EQUAL TKN_STRING
+
+    TKN_EQUAL  shift, and go to state 128
+
+
+state 42
+
+  101 part_parm: K_DEVICECODE . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 129
+
+
+state 43
+
+  102 part_parm: K_STK500_DEVCODE . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 130
+
+
+state 44
+
+  103 part_parm: K_AVR910_DEVCODE . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 131
+
+
+state 45
+
+   99 part_parm: K_ID . TKN_EQUAL TKN_STRING
+
+    TKN_EQUAL  shift, and go to state 132
+
+
+state 46
+
+  152 part_parm: K_NVM_BASE . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 133
+
+
+state 47
+
+  110 part_parm: K_PAGEL . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 134
+
+
+state 48
+
+  154 part_parm: K_PARALLEL . TKN_EQUAL parallel_modes
+
+    TKN_EQUAL  shift, and go to state 135
+
+
+state 49
+
+  112 part_parm: K_RESET . TKN_EQUAL reset_disposition
+
+    TKN_EQUAL  shift, and go to state 136
+
+
+state 50
+
+  155 part_parm: K_RETRY_PULSE . TKN_EQUAL retry_lines
+
+    TKN_EQUAL  shift, and go to state 137
+
+
+state 51
+
+  153 part_parm: K_SERIAL . TKN_EQUAL yesno
+
+    TKN_EQUAL  shift, and go to state 138
+
+
+state 52
+
+  104 part_parm: K_SIGNATURE . TKN_EQUAL TKN_NUMBER TKN_NUMBER TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 139
+
+
+state 53
+
+  113 part_parm: K_TIMEOUT . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 140
+
+
+state 54
+
+  114 part_parm: K_STABDELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 141
+
+
+state 55
+
+  115 part_parm: K_CMDEXEDELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 142
+
+
+state 56
+
+  116 part_parm: K_HVSPCMDEXEDELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 143
+
+
+state 57
+
+  117 part_parm: K_SYNCHLOOPS . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 144
+
+
+state 58
+
+  118 part_parm: K_BYTEDELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 145
+
+
+state 59
+
+  119 part_parm: K_POLLVALUE . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 146
+
+
+state 60
+
+  120 part_parm: K_POLLINDEX . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 147
+
+
+state 61
+
+  121 part_parm: K_PREDELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 148
+
+
+state 62
+
+  122 part_parm: K_POSTDELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 149
+
+
+state 63
+
+  123 part_parm: K_POLLMETHOD . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 150
+
+
+state 64
+
+  124 part_parm: K_HVENTERSTABDELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 151
+
+
+state 65
+
+  125 part_parm: K_PROGMODEDELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 152
+
+
+state 66
+
+  126 part_parm: K_LATCHCYCLES . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 153
+
+
+state 67
+
+  127 part_parm: K_TOGGLEVTG . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 154
+
+
+state 68
+
+  128 part_parm: K_POWEROFFDELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 155
+
+
+state 69
+
+  129 part_parm: K_RESETDELAYMS . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 156
+
+
+state 70
+
+  130 part_parm: K_RESETDELAYUS . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 157
+
+
+state 71
+
+  131 part_parm: K_HVLEAVESTABDELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 158
+
+
+state 72
+
+  132 part_parm: K_RESETDELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 159
+
+
+state 73
+
+  140 part_parm: K_SYNCHCYCLES . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 160
+
+
+state 74
+
+  133 part_parm: K_CHIPERASEPULSEWIDTH . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 161
+
+
+state 75
+
+  134 part_parm: K_CHIPERASEPOLLTIMEOUT . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 162
+
+
+state 76
+
+  135 part_parm: K_CHIPERASETIME . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 163
+
+
+state 77
+
+  136 part_parm: K_PROGRAMFUSEPULSEWIDTH . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 164
+
+
+state 78
+
+  137 part_parm: K_PROGRAMFUSEPOLLTIMEOUT . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 165
+
+
+state 79
+
+  138 part_parm: K_PROGRAMLOCKPULSEWIDTH . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 166
+
+
+state 80
+
+  139 part_parm: K_PROGRAMLOCKPOLLTIMEOUT . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 167
+
+
+state 81
+
+  105 part_parm: K_PP_CONTROLSTACK . TKN_EQUAL num_list
+
+    TKN_EQUAL  shift, and go to state 168
+
+
+state 82
+
+  106 part_parm: K_HVSP_CONTROLSTACK . TKN_EQUAL num_list
+
+    TKN_EQUAL  shift, and go to state 169
+
+
+state 83
+
+  146 part_parm: K_ALLOWFULLPAGEBITSTREAM . TKN_EQUAL yesno
+
+    TKN_EQUAL  shift, and go to state 170
+
+
+state 84
+
+  147 part_parm: K_ENABLEPAGEPROGRAMMING . TKN_EQUAL yesno
+
+    TKN_EQUAL  shift, and go to state 171
+
+
+state 85
+
+  141 part_parm: K_HAS_JTAG . TKN_EQUAL yesno
+
+    TKN_EQUAL  shift, and go to state 172
+
+
+state 86
+
+  142 part_parm: K_HAS_DW . TKN_EQUAL yesno
+
+    TKN_EQUAL  shift, and go to state 173
+
+
+state 87
+
+  143 part_parm: K_HAS_PDI . TKN_EQUAL yesno
+
+    TKN_EQUAL  shift, and go to state 174
+
+
+state 88
+
+  144 part_parm: K_HAS_TPI . TKN_EQUAL yesno
+
+    TKN_EQUAL  shift, and go to state 175
+
+
+state 89
+
+  148 part_parm: K_IDR . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 176
+
+
+state 90
+
+  145 part_parm: K_IS_AVR32 . TKN_EQUAL yesno
+
+    TKN_EQUAL  shift, and go to state 177
+
+
+state 91
+
+  149 part_parm: K_RAMPZ . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 178
+
+
+state 92
+
+  150 part_parm: K_SPMCR . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 179
+
+
+state 93
+
+  151 part_parm: K_EECR . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 180
+
+
+state 94
+
+  107 part_parm: K_FLASH_INSTR . TKN_EQUAL num_list
+
+    TKN_EQUAL  shift, and go to state 181
+
+
+state 95
+
+  108 part_parm: K_EEPROM_INSTR . TKN_EQUAL num_list
+
+    TKN_EQUAL  shift, and go to state 182
+
+
+state 96
+
+  158 part_parm: opcode . TKN_EQUAL string_list
+
+    TKN_EQUAL  shift, and go to state 183
+
+
+state 97
+
+   14 part_def: K_PART @2 part_parms .
+   92 part_parms: part_parms . part_parm TKN_SEMI
+
+    K_READ                    shift, and go to state 26
+    K_WRITE                   shift, and go to state 27
+    K_READ_LO                 shift, and go to state 28
+    K_READ_HI                 shift, and go to state 29
+    K_WRITE_LO                shift, and go to state 30
+    K_WRITE_HI                shift, and go to state 31
+    K_LOADPAGE_LO             shift, and go to state 32
+    K_LOADPAGE_HI             shift, and go to state 33
+    K_LOAD_EXT_ADDR           shift, and go to state 34
+    K_WRITEPAGE               shift, and go to state 35
+    K_CHIP_ERASE              shift, and go to state 36
+    K_PGM_ENABLE              shift, and go to state 37
+    K_MEMORY                  shift, and go to state 38
+    K_BS2                     shift, and go to state 39
+    K_CHIP_ERASE_DELAY        shift, and go to state 40
+    K_DESC                    shift, and go to state 41
+    K_DEVICECODE              shift, and go to state 42
+    K_STK500_DEVCODE          shift, and go to state 43
+    K_AVR910_DEVCODE          shift, and go to state 44
+    K_ID                      shift, and go to state 45
+    K_NVM_BASE                shift, and go to state 46
+    K_PAGEL                   shift, and go to state 47
+    K_PARALLEL                shift, and go to state 48
+    K_RESET                   shift, and go to state 49
+    K_RETRY_PULSE             shift, and go to state 50
+    K_SERIAL                  shift, and go to state 51
+    K_SIGNATURE               shift, and go to state 52
+    K_TIMEOUT                 shift, and go to state 53
+    K_STABDELAY               shift, and go to state 54
+    K_CMDEXEDELAY             shift, and go to state 55
+    K_HVSPCMDEXEDELAY         shift, and go to state 56
+    K_SYNCHLOOPS              shift, and go to state 57
+    K_BYTEDELAY               shift, and go to state 58
+    K_POLLVALUE               shift, and go to state 59
+    K_POLLINDEX               shift, and go to state 60
+    K_PREDELAY                shift, and go to state 61
+    K_POSTDELAY               shift, and go to state 62
+    K_POLLMETHOD              shift, and go to state 63
+    K_HVENTERSTABDELAY        shift, and go to state 64
+    K_PROGMODEDELAY           shift, and go to state 65
+    K_LATCHCYCLES             shift, and go to state 66
+    K_TOGGLEVTG               shift, and go to state 67
+    K_POWEROFFDELAY           shift, and go to state 68
+    K_RESETDELAYMS            shift, and go to state 69
+    K_RESETDELAYUS            shift, and go to state 70
+    K_HVLEAVESTABDELAY        shift, and go to state 71
+    K_RESETDELAY              shift, and go to state 72
+    K_SYNCHCYCLES             shift, and go to state 73
+    K_CHIPERASEPULSEWIDTH     shift, and go to state 74
+    K_CHIPERASEPOLLTIMEOUT    shift, and go to state 75
+    K_CHIPERASETIME           shift, and go to state 76
+    K_PROGRAMFUSEPULSEWIDTH   shift, and go to state 77
+    K_PROGRAMFUSEPOLLTIMEOUT  shift, and go to state 78
+    K_PROGRAMLOCKPULSEWIDTH   shift, and go to state 79
+    K_PROGRAMLOCKPOLLTIMEOUT  shift, and go to state 80
+    K_PP_CONTROLSTACK         shift, and go to state 81
+    K_HVSP_CONTROLSTACK       shift, and go to state 82
+    K_ALLOWFULLPAGEBITSTREAM  shift, and go to state 83
+    K_ENABLEPAGEPROGRAMMING   shift, and go to state 84
+    K_HAS_JTAG                shift, and go to state 85
+    K_HAS_DW                  shift, and go to state 86
+    K_HAS_PDI                 shift, and go to state 87
+    K_HAS_TPI                 shift, and go to state 88
+    K_IDR                     shift, and go to state 89
+    K_IS_AVR32                shift, and go to state 90
+    K_RAMPZ                   shift, and go to state 91
+    K_SPMCR                   shift, and go to state 92
+    K_EECR                    shift, and go to state 93
+    K_FLASH_INSTR             shift, and go to state 94
+    K_EEPROM_INSTR            shift, and go to state 95
+
+    $default  reduce using rule 14 (part_def)
+
+    opcode     go to state 96
+    part_parm  go to state 184
+
+
+state 98
+
+   91 part_parms: part_parm . TKN_SEMI
+
+    TKN_SEMI  shift, and go to state 185
+
+
+state 99
+
+   62 prog_parm: K_BAUDRATE . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 186
+
+
+state 100
+
+   55 prog_parm: K_BUFF . TKN_EQUAL num_list
+
+    TKN_EQUAL  shift, and go to state 187
+
+
+state 101
+
+   53 prog_parm: K_DESC . TKN_EQUAL TKN_STRING
+
+    TKN_EQUAL  shift, and go to state 188
+
+
+state 102
+
+   67 prog_parm: K_ERRLED . TKN_EQUAL TKN_NUMBER
+   75          | K_ERRLED . TKN_EQUAL TKN_TILDE TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 189
+
+
+state 103
+
+   21 prog_parm: K_ID . TKN_EQUAL string_list
+
+    TKN_EQUAL  shift, and go to state 190
+
+
+state 104
+
+   66 prog_parm: K_MISO . TKN_EQUAL TKN_NUMBER
+   74          | K_MISO . TKN_EQUAL TKN_TILDE TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 191
+
+
+state 105
+
+   65 prog_parm: K_MOSI . TKN_EQUAL TKN_NUMBER
+   73          | K_MOSI . TKN_EQUAL TKN_TILDE TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 192
+
+
+state 106
+
+   69 prog_parm: K_PGMLED . TKN_EQUAL TKN_NUMBER
+   77          | K_PGMLED . TKN_EQUAL TKN_TILDE TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 193
+
+
+state 107
+
+   68 prog_parm: K_RDYLED . TKN_EQUAL TKN_NUMBER
+   76          | K_RDYLED . TKN_EQUAL TKN_TILDE TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 194
+
+
+state 108
+
+   63 prog_parm: K_RESET . TKN_EQUAL TKN_NUMBER
+   71          | K_RESET . TKN_EQUAL TKN_TILDE TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 195
+
+
+state 109
+
+   64 prog_parm: K_SCK . TKN_EQUAL TKN_NUMBER
+   72          | K_SCK . TKN_EQUAL TKN_TILDE TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 196
+
+
+state 110
+
+   56 prog_parm: K_USBDEV . TKN_EQUAL TKN_STRING
+
+    TKN_EQUAL  shift, and go to state 197
+
+
+state 111
+
+   59 prog_parm: K_USBSN . TKN_EQUAL TKN_STRING
+
+    TKN_EQUAL  shift, and go to state 198
+
+
+state 112
+
+   58 prog_parm: K_USBPID . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 199
+
+
+state 113
+
+   61 prog_parm: K_USBPRODUCT . TKN_EQUAL TKN_STRING
+
+    TKN_EQUAL  shift, and go to state 200
+
+
+state 114
+
+   60 prog_parm: K_USBVENDOR . TKN_EQUAL TKN_STRING
+
+    TKN_EQUAL  shift, and go to state 201
+
+
+state 115
+
+   57 prog_parm: K_USBVID . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 202
+
+
+state 116
+
+   22 prog_parm: K_TYPE . TKN_EQUAL K_PAR
+   23          | K_TYPE . TKN_EQUAL K_SERBB
+   24          | K_TYPE . TKN_EQUAL K_STK500
+   25          | K_TYPE . TKN_EQUAL K_STK500V2
+   26          | K_TYPE . TKN_EQUAL K_WIRING
+   27          | K_TYPE . TKN_EQUAL K_STK500HVSP
+   28          | K_TYPE . TKN_EQUAL K_STK500PP
+   29          | K_TYPE . TKN_EQUAL K_STK500GENERIC
+   30          | K_TYPE . TKN_EQUAL K_ARDUINO
+   31          | K_TYPE . TKN_EQUAL K_AVRFTDI
+   32          | K_TYPE . TKN_EQUAL K_BUSPIRATE
+   33          | K_TYPE . TKN_EQUAL K_STK600
+   34          | K_TYPE . TKN_EQUAL K_STK600HVSP
+   35          | K_TYPE . TKN_EQUAL K_STK600PP
+   36          | K_TYPE . TKN_EQUAL K_AVR910
+   37          | K_TYPE . TKN_EQUAL K_USBASP
+   38          | K_TYPE . TKN_EQUAL K_USBTINY
+   39          | K_TYPE . TKN_EQUAL K_BUTTERFLY
+   40          | K_TYPE . TKN_EQUAL K_BUTTERFLY_MK
+   41          | K_TYPE . TKN_EQUAL K_JTAG_MKI
+   42          | K_TYPE . TKN_EQUAL K_JTAG_MKII
+   43          | K_TYPE . TKN_EQUAL K_JTAG_MKII_AVR32
+   44          | K_TYPE . TKN_EQUAL K_JTAG_MKII_DW
+   45          | K_TYPE . TKN_EQUAL K_JTAG_MKII_ISP
+   46          | K_TYPE . TKN_EQUAL K_JTAG_MKII_PDI
+   47          | K_TYPE . TKN_EQUAL K_DRAGON_DW
+   48          | K_TYPE . TKN_EQUAL K_DRAGON_HVSP
+   49          | K_TYPE . TKN_EQUAL K_DRAGON_ISP
+   50          | K_TYPE . TKN_EQUAL K_DRAGON_JTAG
+   51          | K_TYPE . TKN_EQUAL K_DRAGON_PDI
+   52          | K_TYPE . TKN_EQUAL K_DRAGON_PP
+
+    TKN_EQUAL  shift, and go to state 203
+
+
+state 117
+
+   54 prog_parm: K_VCC . TKN_EQUAL num_list
+
+    TKN_EQUAL  shift, and go to state 204
+
+
+state 118
+
+   70 prog_parm: K_VFYLED . TKN_EQUAL TKN_NUMBER
+   78          | K_VFYLED . TKN_EQUAL TKN_TILDE TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 205
+
+
+state 119
+
+   12 prog_def: K_PROGRAMMER @1 prog_parms .
+   20 prog_parms: prog_parms . prog_parm TKN_SEMI
+
+    K_BAUDRATE    shift, and go to state 99
+    K_BUFF        shift, and go to state 100
+    K_DESC        shift, and go to state 101
+    K_ERRLED      shift, and go to state 102
+    K_ID          shift, and go to state 103
+    K_MISO        shift, and go to state 104
+    K_MOSI        shift, and go to state 105
+    K_PGMLED      shift, and go to state 106
+    K_RDYLED      shift, and go to state 107
+    K_RESET       shift, and go to state 108
+    K_SCK         shift, and go to state 109
+    K_USBDEV      shift, and go to state 110
+    K_USBSN       shift, and go to state 111
+    K_USBPID      shift, and go to state 112
+    K_USBPRODUCT  shift, and go to state 113
+    K_USBVENDOR   shift, and go to state 114
+    K_USBVID      shift, and go to state 115
+    K_TYPE        shift, and go to state 116
+    K_VCC         shift, and go to state 117
+    K_VFYLED      shift, and go to state 118
+
+    $default  reduce using rule 12 (prog_def)
+
+    prog_parm  go to state 206
+
+
+state 120
+
+   19 prog_parms: prog_parm . TKN_SEMI
+
+    TKN_SEMI  shift, and go to state 207
+
+
+state 121
+
+    8 def: K_DEFAULT_PARALLEL TKN_EQUAL TKN_STRING TKN_SEMI .
+
+    $default  reduce using rule 8 (def)
+
+
+state 122
+
+    7 def: K_DEFAULT_PROGRAMMER TKN_EQUAL TKN_STRING TKN_SEMI .
+
+    $default  reduce using rule 7 (def)
+
+
+state 123
+
+    9 def: K_DEFAULT_SERIAL TKN_EQUAL TKN_STRING TKN_SEMI .
+
+    $default  reduce using rule 9 (def)
+
+
+state 124
+
+   10 def: K_DEFAULT_BITCLOCK TKN_EQUAL TKN_NUMBER TKN_SEMI .
+
+    $default  reduce using rule 10 (def)
+
+
+state 125
+
+  157 part_parm: K_MEMORY TKN_STRING . @3 mem_specs
+
+    $default  reduce using rule 156 (@3)
+
+    @3  go to state 208
+
+
+state 126
+
+  111 part_parm: K_BS2 TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 209
+
+
+state 127
+
+  109 part_parm: K_CHIP_ERASE_DELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 210
+
+
+state 128
+
+  100 part_parm: K_DESC TKN_EQUAL . TKN_STRING
+
+    TKN_STRING  shift, and go to state 211
+
+
+state 129
+
+  101 part_parm: K_DEVICECODE TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 212
+
+
+state 130
+
+  102 part_parm: K_STK500_DEVCODE TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 213
+
+
+state 131
+
+  103 part_parm: K_AVR910_DEVCODE TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 214
+
+
+state 132
+
+   99 part_parm: K_ID TKN_EQUAL . TKN_STRING
+
+    TKN_STRING  shift, and go to state 215
+
+
+state 133
+
+  152 part_parm: K_NVM_BASE TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 216
+
+
+state 134
+
+  110 part_parm: K_PAGEL TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 217
+
+
+state 135
+
+  154 part_parm: K_PARALLEL TKN_EQUAL . parallel_modes
+
+    K_PSEUDO  shift, and go to state 218
+    K_NO      shift, and go to state 219
+    K_YES     shift, and go to state 220
+
+    parallel_modes  go to state 221
+    yesno           go to state 222
+
+
+state 136
+
+  112 part_parm: K_RESET TKN_EQUAL . reset_disposition
+
+    K_DEDICATED  shift, and go to state 223
+    K_IO         shift, and go to state 224
+
+    reset_disposition  go to state 225
+
+
+state 137
+
+  155 part_parm: K_RETRY_PULSE TKN_EQUAL . retry_lines
+
+    K_RESET  shift, and go to state 226
+    K_SCK    shift, and go to state 227
+
+    retry_lines  go to state 228
+
+
+state 138
+
+  153 part_parm: K_SERIAL TKN_EQUAL . yesno
+
+    K_NO   shift, and go to state 219
+    K_YES  shift, and go to state 220
+
+    yesno  go to state 229
+
+
+state 139
+
+  104 part_parm: K_SIGNATURE TKN_EQUAL . TKN_NUMBER TKN_NUMBER TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 230
+
+
+state 140
+
+  113 part_parm: K_TIMEOUT TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 231
+
+
+state 141
+
+  114 part_parm: K_STABDELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 232
+
+
+state 142
+
+  115 part_parm: K_CMDEXEDELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 233
+
+
+state 143
+
+  116 part_parm: K_HVSPCMDEXEDELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 234
+
+
+state 144
+
+  117 part_parm: K_SYNCHLOOPS TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 235
+
+
+state 145
+
+  118 part_parm: K_BYTEDELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 236
+
+
+state 146
+
+  119 part_parm: K_POLLVALUE TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 237
+
+
+state 147
+
+  120 part_parm: K_POLLINDEX TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 238
+
+
+state 148
+
+  121 part_parm: K_PREDELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 239
+
+
+state 149
+
+  122 part_parm: K_POSTDELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 240
+
+
+state 150
+
+  123 part_parm: K_POLLMETHOD TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 241
+
+
+state 151
+
+  124 part_parm: K_HVENTERSTABDELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 242
+
+
+state 152
+
+  125 part_parm: K_PROGMODEDELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 243
+
+
+state 153
+
+  126 part_parm: K_LATCHCYCLES TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 244
+
+
+state 154
+
+  127 part_parm: K_TOGGLEVTG TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 245
+
+
+state 155
+
+  128 part_parm: K_POWEROFFDELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 246
+
+
+state 156
+
+  129 part_parm: K_RESETDELAYMS TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 247
+
+
+state 157
+
+  130 part_parm: K_RESETDELAYUS TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 248
+
+
+state 158
+
+  131 part_parm: K_HVLEAVESTABDELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 249
+
+
+state 159
+
+  132 part_parm: K_RESETDELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 250
+
+
+state 160
+
+  140 part_parm: K_SYNCHCYCLES TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 251
+
+
+state 161
+
+  133 part_parm: K_CHIPERASEPULSEWIDTH TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 252
+
+
+state 162
+
+  134 part_parm: K_CHIPERASEPOLLTIMEOUT TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 253
+
+
+state 163
+
+  135 part_parm: K_CHIPERASETIME TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 254
+
+
+state 164
+
+  136 part_parm: K_PROGRAMFUSEPULSEWIDTH TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 255
+
+
+state 165
+
+  137 part_parm: K_PROGRAMFUSEPOLLTIMEOUT TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 256
+
+
+state 166
+
+  138 part_parm: K_PROGRAMLOCKPULSEWIDTH TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 257
+
+
+state 167
+
+  139 part_parm: K_PROGRAMLOCKPOLLTIMEOUT TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 258
+
+
+state 168
+
+  105 part_parm: K_PP_CONTROLSTACK TKN_EQUAL . num_list
+
+    TKN_NUMBER  shift, and go to state 259
+
+    num_list  go to state 260
+
+
+state 169
+
+  106 part_parm: K_HVSP_CONTROLSTACK TKN_EQUAL . num_list
+
+    TKN_NUMBER  shift, and go to state 259
+
+    num_list  go to state 261
+
+
+state 170
+
+  146 part_parm: K_ALLOWFULLPAGEBITSTREAM TKN_EQUAL . yesno
+
+    K_NO   shift, and go to state 219
+    K_YES  shift, and go to state 220
+
+    yesno  go to state 262
+
+
+state 171
+
+  147 part_parm: K_ENABLEPAGEPROGRAMMING TKN_EQUAL . yesno
+
+    K_NO   shift, and go to state 219
+    K_YES  shift, and go to state 220
+
+    yesno  go to state 263
+
+
+state 172
+
+  141 part_parm: K_HAS_JTAG TKN_EQUAL . yesno
+
+    K_NO   shift, and go to state 219
+    K_YES  shift, and go to state 220
+
+    yesno  go to state 264
+
+
+state 173
+
+  142 part_parm: K_HAS_DW TKN_EQUAL . yesno
+
+    K_NO   shift, and go to state 219
+    K_YES  shift, and go to state 220
+
+    yesno  go to state 265
+
+
+state 174
+
+  143 part_parm: K_HAS_PDI TKN_EQUAL . yesno
+
+    K_NO   shift, and go to state 219
+    K_YES  shift, and go to state 220
+
+    yesno  go to state 266
+
+
+state 175
+
+  144 part_parm: K_HAS_TPI TKN_EQUAL . yesno
+
+    K_NO   shift, and go to state 219
+    K_YES  shift, and go to state 220
+
+    yesno  go to state 267
+
+
+state 176
+
+  148 part_parm: K_IDR TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 268
+
+
+state 177
+
+  145 part_parm: K_IS_AVR32 TKN_EQUAL . yesno
+
+    K_NO   shift, and go to state 219
+    K_YES  shift, and go to state 220
+
+    yesno  go to state 269
+
+
+state 178
+
+  149 part_parm: K_RAMPZ TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 270
+
+
+state 179
+
+  150 part_parm: K_SPMCR TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 271
+
+
+state 180
+
+  151 part_parm: K_EECR TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 272
+
+
+state 181
+
+  107 part_parm: K_FLASH_INSTR TKN_EQUAL . num_list
+
+    TKN_NUMBER  shift, and go to state 259
+
+    num_list  go to state 273
+
+
+state 182
+
+  108 part_parm: K_EEPROM_INSTR TKN_EQUAL . num_list
+
+    TKN_NUMBER  shift, and go to state 259
+
+    num_list  go to state 274
+
+
+state 183
+
+  158 part_parm: opcode TKN_EQUAL . string_list
+
+    TKN_STRING  shift, and go to state 275
+
+    string_list  go to state 276
+
+
+state 184
+
+   92 part_parms: part_parms part_parm . TKN_SEMI
+
+    TKN_SEMI  shift, and go to state 277
+
+
+state 185
+
+   91 part_parms: part_parm TKN_SEMI .
+
+    $default  reduce using rule 91 (part_parms)
+
+
+state 186
+
+   62 prog_parm: K_BAUDRATE TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 278
+
+
+state 187
+
+   55 prog_parm: K_BUFF TKN_EQUAL . num_list
+
+    TKN_NUMBER  shift, and go to state 259
+
+    num_list  go to state 279
+
+
+state 188
+
+   53 prog_parm: K_DESC TKN_EQUAL . TKN_STRING
+
+    TKN_STRING  shift, and go to state 280
+
+
+state 189
+
+   67 prog_parm: K_ERRLED TKN_EQUAL . TKN_NUMBER
+   75          | K_ERRLED TKN_EQUAL . TKN_TILDE TKN_NUMBER
+
+    TKN_TILDE   shift, and go to state 281
+    TKN_NUMBER  shift, and go to state 282
+
+
+state 190
+
+   21 prog_parm: K_ID TKN_EQUAL . string_list
+
+    TKN_STRING  shift, and go to state 275
+
+    string_list  go to state 283
+
+
+state 191
+
+   66 prog_parm: K_MISO TKN_EQUAL . TKN_NUMBER
+   74          | K_MISO TKN_EQUAL . TKN_TILDE TKN_NUMBER
+
+    TKN_TILDE   shift, and go to state 284
+    TKN_NUMBER  shift, and go to state 285
+
+
+state 192
+
+   65 prog_parm: K_MOSI TKN_EQUAL . TKN_NUMBER
+   73          | K_MOSI TKN_EQUAL . TKN_TILDE TKN_NUMBER
+
+    TKN_TILDE   shift, and go to state 286
+    TKN_NUMBER  shift, and go to state 287
+
+
+state 193
+
+   69 prog_parm: K_PGMLED TKN_EQUAL . TKN_NUMBER
+   77          | K_PGMLED TKN_EQUAL . TKN_TILDE TKN_NUMBER
+
+    TKN_TILDE   shift, and go to state 288
+    TKN_NUMBER  shift, and go to state 289
+
+
+state 194
+
+   68 prog_parm: K_RDYLED TKN_EQUAL . TKN_NUMBER
+   76          | K_RDYLED TKN_EQUAL . TKN_TILDE TKN_NUMBER
+
+    TKN_TILDE   shift, and go to state 290
+    TKN_NUMBER  shift, and go to state 291
+
+
+state 195
+
+   63 prog_parm: K_RESET TKN_EQUAL . TKN_NUMBER
+   71          | K_RESET TKN_EQUAL . TKN_TILDE TKN_NUMBER
+
+    TKN_TILDE   shift, and go to state 292
+    TKN_NUMBER  shift, and go to state 293
+
+
+state 196
+
+   64 prog_parm: K_SCK TKN_EQUAL . TKN_NUMBER
+   72          | K_SCK TKN_EQUAL . TKN_TILDE TKN_NUMBER
+
+    TKN_TILDE   shift, and go to state 294
+    TKN_NUMBER  shift, and go to state 295
+
+
+state 197
+
+   56 prog_parm: K_USBDEV TKN_EQUAL . TKN_STRING
+
+    TKN_STRING  shift, and go to state 296
+
+
+state 198
+
+   59 prog_parm: K_USBSN TKN_EQUAL . TKN_STRING
+
+    TKN_STRING  shift, and go to state 297
+
+
+state 199
+
+   58 prog_parm: K_USBPID TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 298
+
+
+state 200
+
+   61 prog_parm: K_USBPRODUCT TKN_EQUAL . TKN_STRING
+
+    TKN_STRING  shift, and go to state 299
+
+
+state 201
+
+   60 prog_parm: K_USBVENDOR TKN_EQUAL . TKN_STRING
+
+    TKN_STRING  shift, and go to state 300
+
+
+state 202
+
+   57 prog_parm: K_USBVID TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 301
+
+
+state 203
+
+   22 prog_parm: K_TYPE TKN_EQUAL . K_PAR
+   23          | K_TYPE TKN_EQUAL . K_SERBB
+   24          | K_TYPE TKN_EQUAL . K_STK500
+   25          | K_TYPE TKN_EQUAL . K_STK500V2
+   26          | K_TYPE TKN_EQUAL . K_WIRING
+   27          | K_TYPE TKN_EQUAL . K_STK500HVSP
+   28          | K_TYPE TKN_EQUAL . K_STK500PP
+   29          | K_TYPE TKN_EQUAL . K_STK500GENERIC
+   30          | K_TYPE TKN_EQUAL . K_ARDUINO
+   31          | K_TYPE TKN_EQUAL . K_AVRFTDI
+   32          | K_TYPE TKN_EQUAL . K_BUSPIRATE
+   33          | K_TYPE TKN_EQUAL . K_STK600
+   34          | K_TYPE TKN_EQUAL . K_STK600HVSP
+   35          | K_TYPE TKN_EQUAL . K_STK600PP
+   36          | K_TYPE TKN_EQUAL . K_AVR910
+   37          | K_TYPE TKN_EQUAL . K_USBASP
+   38          | K_TYPE TKN_EQUAL . K_USBTINY
+   39          | K_TYPE TKN_EQUAL . K_BUTTERFLY
+   40          | K_TYPE TKN_EQUAL . K_BUTTERFLY_MK
+   41          | K_TYPE TKN_EQUAL . K_JTAG_MKI
+   42          | K_TYPE TKN_EQUAL . K_JTAG_MKII
+   43          | K_TYPE TKN_EQUAL . K_JTAG_MKII_AVR32
+   44          | K_TYPE TKN_EQUAL . K_JTAG_MKII_DW
+   45          | K_TYPE TKN_EQUAL . K_JTAG_MKII_ISP
+   46          | K_TYPE TKN_EQUAL . K_JTAG_MKII_PDI
+   47          | K_TYPE TKN_EQUAL . K_DRAGON_DW
+   48          | K_TYPE TKN_EQUAL . K_DRAGON_HVSP
+   49          | K_TYPE TKN_EQUAL . K_DRAGON_ISP
+   50          | K_TYPE TKN_EQUAL . K_DRAGON_JTAG
+   51          | K_TYPE TKN_EQUAL . K_DRAGON_PDI
+   52          | K_TYPE TKN_EQUAL . K_DRAGON_PP
+
+    K_ARDUINO          shift, and go to state 302
+    K_AVRFTDI          shift, and go to state 303
+    K_BUSPIRATE        shift, and go to state 304
+    K_DRAGON_DW        shift, and go to state 305
+    K_DRAGON_HVSP      shift, and go to state 306
+    K_DRAGON_ISP       shift, and go to state 307
+    K_DRAGON_JTAG      shift, and go to state 308
+    K_DRAGON_PDI       shift, and go to state 309
+    K_DRAGON_PP        shift, and go to state 310
+    K_JTAG_MKI         shift, and go to state 311
+    K_JTAG_MKII        shift, and go to state 312
+    K_JTAG_MKII_AVR32  shift, and go to state 313
+    K_JTAG_MKII_DW     shift, and go to state 314
+    K_JTAG_MKII_ISP    shift, and go to state 315
+    K_JTAG_MKII_PDI    shift, and go to state 316
+    K_PAR              shift, and go to state 317
+    K_SERBB            shift, and go to state 318
+    K_STK500           shift, and go to state 319
+    K_STK500HVSP       shift, and go to state 320
+    K_STK500PP         shift, and go to state 321
+    K_STK500V2         shift, and go to state 322
+    K_STK500GENERIC    shift, and go to state 323
+    K_STK600           shift, and go to state 324
+    K_STK600HVSP       shift, and go to state 325
+    K_STK600PP         shift, and go to state 326
+    K_AVR910           shift, and go to state 327
+    K_USBASP           shift, and go to state 328
+    K_USBTINY          shift, and go to state 329
+    K_BUTTERFLY        shift, and go to state 330
+    K_BUTTERFLY_MK     shift, and go to state 331
+    K_WIRING           shift, and go to state 332
+
+
+state 204
+
+   54 prog_parm: K_VCC TKN_EQUAL . num_list
+
+    TKN_NUMBER  shift, and go to state 259
+
+    num_list  go to state 333
+
+
+state 205
+
+   70 prog_parm: K_VFYLED TKN_EQUAL . TKN_NUMBER
+   78          | K_VFYLED TKN_EQUAL . TKN_TILDE TKN_NUMBER
+
+    TKN_TILDE   shift, and go to state 334
+    TKN_NUMBER  shift, and go to state 335
+
+
+state 206
+
+   20 prog_parms: prog_parms prog_parm . TKN_SEMI
+
+    TKN_SEMI  shift, and go to state 336
+
+
+state 207
+
+   19 prog_parms: prog_parm TKN_SEMI .
+
+    $default  reduce using rule 19 (prog_parms)
+
+
+state 208
+
+  157 part_parm: K_MEMORY TKN_STRING @3 . mem_specs
+
+    K_READ                shift, and go to state 26
+    K_WRITE               shift, and go to state 27
+    K_READ_LO             shift, and go to state 28
+    K_READ_HI             shift, and go to state 29
+    K_WRITE_LO            shift, and go to state 30
+    K_WRITE_HI            shift, and go to state 31
+    K_LOADPAGE_LO         shift, and go to state 32
+    K_LOADPAGE_HI         shift, and go to state 33
+    K_LOAD_EXT_ADDR       shift, and go to state 34
+    K_WRITEPAGE           shift, and go to state 35
+    K_CHIP_ERASE          shift, and go to state 36
+    K_PGM_ENABLE          shift, and go to state 37
+    K_PAGE_SIZE           shift, and go to state 337
+    K_PAGED               shift, and go to state 338
+    K_MAX_WRITE_DELAY     shift, and go to state 339
+    K_MIN_WRITE_DELAY     shift, and go to state 340
+    K_NUM_PAGES           shift, and go to state 341
+    K_OFFSET              shift, and go to state 342
+    K_PWROFF_AFTER_WRITE  shift, and go to state 343
+    K_READBACK_P1         shift, and go to state 344
+    K_READBACK_P2         shift, and go to state 345
+    K_SIZE                shift, and go to state 346
+    K_POLLINDEX           shift, and go to state 347
+    K_MODE                shift, and go to state 348
+    K_DELAY               shift, and go to state 349
+    K_BLOCKSIZE           shift, and go to state 350
+    K_READSIZE            shift, and go to state 351
+
+    opcode     go to state 352
+    mem_specs  go to state 353
+    mem_spec   go to state 354
+
+
+state 209
+
+  111 part_parm: K_BS2 TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 111 (part_parm)
+
+
+state 210
+
+  109 part_parm: K_CHIP_ERASE_DELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 109 (part_parm)
+
+
+state 211
+
+  100 part_parm: K_DESC TKN_EQUAL TKN_STRING .
+
+    $default  reduce using rule 100 (part_parm)
+
+
+state 212
+
+  101 part_parm: K_DEVICECODE TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 101 (part_parm)
+
+
+state 213
+
+  102 part_parm: K_STK500_DEVCODE TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 102 (part_parm)
+
+
+state 214
+
+  103 part_parm: K_AVR910_DEVCODE TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 103 (part_parm)
+
+
+state 215
+
+   99 part_parm: K_ID TKN_EQUAL TKN_STRING .
+
+    $default  reduce using rule 99 (part_parm)
+
+
+state 216
+
+  152 part_parm: K_NVM_BASE TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 152 (part_parm)
+
+
+state 217
+
+  110 part_parm: K_PAGEL TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 110 (part_parm)
+
+
+state 218
+
+   96 parallel_modes: K_PSEUDO .
+
+    $default  reduce using rule 96 (parallel_modes)
+
+
+state 219
+
+  160 yesno: K_NO .
+
+    $default  reduce using rule 160 (yesno)
+
+
+state 220
+
+  159 yesno: K_YES .
+
+    $default  reduce using rule 159 (yesno)
+
+
+state 221
+
+  154 part_parm: K_PARALLEL TKN_EQUAL parallel_modes .
+
+    $default  reduce using rule 154 (part_parm)
+
+
+state 222
+
+   95 parallel_modes: yesno .
+
+    $default  reduce using rule 95 (parallel_modes)
+
+
+state 223
+
+   93 reset_disposition: K_DEDICATED .
+
+    $default  reduce using rule 93 (reset_disposition)
+
+
+state 224
+
+   94 reset_disposition: K_IO .
+
+    $default  reduce using rule 94 (reset_disposition)
+
+
+state 225
+
+  112 part_parm: K_RESET TKN_EQUAL reset_disposition .
+
+    $default  reduce using rule 112 (part_parm)
+
+
+state 226
+
+   97 retry_lines: K_RESET .
+
+    $default  reduce using rule 97 (retry_lines)
+
+
+state 227
+
+   98 retry_lines: K_SCK .
+
+    $default  reduce using rule 98 (retry_lines)
+
+
+state 228
+
+  155 part_parm: K_RETRY_PULSE TKN_EQUAL retry_lines .
+
+    $default  reduce using rule 155 (part_parm)
+
+
+state 229
+
+  153 part_parm: K_SERIAL TKN_EQUAL yesno .
+
+    $default  reduce using rule 153 (part_parm)
+
+
+state 230
+
+  104 part_parm: K_SIGNATURE TKN_EQUAL TKN_NUMBER . TKN_NUMBER TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 355
+
+
+state 231
+
+  113 part_parm: K_TIMEOUT TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 113 (part_parm)
+
+
+state 232
+
+  114 part_parm: K_STABDELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 114 (part_parm)
+
+
+state 233
+
+  115 part_parm: K_CMDEXEDELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 115 (part_parm)
+
+
+state 234
+
+  116 part_parm: K_HVSPCMDEXEDELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 116 (part_parm)
+
+
+state 235
+
+  117 part_parm: K_SYNCHLOOPS TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 117 (part_parm)
+
+
+state 236
+
+  118 part_parm: K_BYTEDELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 118 (part_parm)
+
+
+state 237
+
+  119 part_parm: K_POLLVALUE TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 119 (part_parm)
+
+
+state 238
+
+  120 part_parm: K_POLLINDEX TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 120 (part_parm)
+
+
+state 239
+
+  121 part_parm: K_PREDELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 121 (part_parm)
+
+
+state 240
+
+  122 part_parm: K_POSTDELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 122 (part_parm)
+
+
+state 241
+
+  123 part_parm: K_POLLMETHOD TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 123 (part_parm)
+
+
+state 242
+
+  124 part_parm: K_HVENTERSTABDELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 124 (part_parm)
+
+
+state 243
+
+  125 part_parm: K_PROGMODEDELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 125 (part_parm)
+
+
+state 244
+
+  126 part_parm: K_LATCHCYCLES TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 126 (part_parm)
+
+
+state 245
+
+  127 part_parm: K_TOGGLEVTG TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 127 (part_parm)
+
+
+state 246
+
+  128 part_parm: K_POWEROFFDELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 128 (part_parm)
+
+
+state 247
+
+  129 part_parm: K_RESETDELAYMS TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 129 (part_parm)
+
+
+state 248
+
+  130 part_parm: K_RESETDELAYUS TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 130 (part_parm)
+
+
+state 249
+
+  131 part_parm: K_HVLEAVESTABDELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 131 (part_parm)
+
+
+state 250
+
+  132 part_parm: K_RESETDELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 132 (part_parm)
+
+
+state 251
+
+  140 part_parm: K_SYNCHCYCLES TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 140 (part_parm)
+
+
+state 252
+
+  133 part_parm: K_CHIPERASEPULSEWIDTH TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 133 (part_parm)
+
+
+state 253
+
+  134 part_parm: K_CHIPERASEPOLLTIMEOUT TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 134 (part_parm)
+
+
+state 254
+
+  135 part_parm: K_CHIPERASETIME TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 135 (part_parm)
+
+
+state 255
+
+  136 part_parm: K_PROGRAMFUSEPULSEWIDTH TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 136 (part_parm)
+
+
+state 256
+
+  137 part_parm: K_PROGRAMFUSEPOLLTIMEOUT TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 137 (part_parm)
+
+
+state 257
+
+  138 part_parm: K_PROGRAMLOCKPULSEWIDTH TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 138 (part_parm)
+
+
+state 258
+
+  139 part_parm: K_PROGRAMLOCKPOLLTIMEOUT TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 139 (part_parm)
+
+
+state 259
+
+   17 num_list: TKN_NUMBER .
+
+    $default  reduce using rule 17 (num_list)
+
+
+state 260
+
+   18 num_list: num_list . TKN_COMMA TKN_NUMBER
+  105 part_parm: K_PP_CONTROLSTACK TKN_EQUAL num_list .
+
+    TKN_COMMA  shift, and go to state 356
+
+    $default  reduce using rule 105 (part_parm)
+
+
+state 261
+
+   18 num_list: num_list . TKN_COMMA TKN_NUMBER
+  106 part_parm: K_HVSP_CONTROLSTACK TKN_EQUAL num_list .
+
+    TKN_COMMA  shift, and go to state 356
+
+    $default  reduce using rule 106 (part_parm)
+
+
+state 262
+
+  146 part_parm: K_ALLOWFULLPAGEBITSTREAM TKN_EQUAL yesno .
+
+    $default  reduce using rule 146 (part_parm)
+
+
+state 263
+
+  147 part_parm: K_ENABLEPAGEPROGRAMMING TKN_EQUAL yesno .
+
+    $default  reduce using rule 147 (part_parm)
+
+
+state 264
+
+  141 part_parm: K_HAS_JTAG TKN_EQUAL yesno .
+
+    $default  reduce using rule 141 (part_parm)
+
+
+state 265
+
+  142 part_parm: K_HAS_DW TKN_EQUAL yesno .
+
+    $default  reduce using rule 142 (part_parm)
+
+
+state 266
+
+  143 part_parm: K_HAS_PDI TKN_EQUAL yesno .
+
+    $default  reduce using rule 143 (part_parm)
+
+
+state 267
+
+  144 part_parm: K_HAS_TPI TKN_EQUAL yesno .
+
+    $default  reduce using rule 144 (part_parm)
+
+
+state 268
+
+  148 part_parm: K_IDR TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 148 (part_parm)
+
+
+state 269
+
+  145 part_parm: K_IS_AVR32 TKN_EQUAL yesno .
+
+    $default  reduce using rule 145 (part_parm)
+
+
+state 270
+
+  149 part_parm: K_RAMPZ TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 149 (part_parm)
+
+
+state 271
+
+  150 part_parm: K_SPMCR TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 150 (part_parm)
+
+
+state 272
+
+  151 part_parm: K_EECR TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 151 (part_parm)
+
+
+state 273
+
+   18 num_list: num_list . TKN_COMMA TKN_NUMBER
+  107 part_parm: K_FLASH_INSTR TKN_EQUAL num_list .
+
+    TKN_COMMA  shift, and go to state 356
+
+    $default  reduce using rule 107 (part_parm)
+
+
+state 274
+
+   18 num_list: num_list . TKN_COMMA TKN_NUMBER
+  108 part_parm: K_EEPROM_INSTR TKN_EQUAL num_list .
+
+    TKN_COMMA  shift, and go to state 356
+
+    $default  reduce using rule 108 (part_parm)
+
+
+state 275
+
+   15 string_list: TKN_STRING .
+
+    $default  reduce using rule 15 (string_list)
+
+
+state 276
+
+   16 string_list: string_list . TKN_COMMA TKN_STRING
+  158 part_parm: opcode TKN_EQUAL string_list .
+
+    TKN_COMMA  shift, and go to state 357
+
+    $default  reduce using rule 158 (part_parm)
+
+
+state 277
+
+   92 part_parms: part_parms part_parm TKN_SEMI .
+
+    $default  reduce using rule 92 (part_parms)
+
+
+state 278
+
+   62 prog_parm: K_BAUDRATE TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 62 (prog_parm)
+
+
+state 279
+
+   18 num_list: num_list . TKN_COMMA TKN_NUMBER
+   55 prog_parm: K_BUFF TKN_EQUAL num_list .
+
+    TKN_COMMA  shift, and go to state 356
+
+    $default  reduce using rule 55 (prog_parm)
+
+
+state 280
+
+   53 prog_parm: K_DESC TKN_EQUAL TKN_STRING .
+
+    $default  reduce using rule 53 (prog_parm)
+
+
+state 281
+
+   75 prog_parm: K_ERRLED TKN_EQUAL TKN_TILDE . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 358
+
+
+state 282
+
+   67 prog_parm: K_ERRLED TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 67 (prog_parm)
+
+
+state 283
+
+   16 string_list: string_list . TKN_COMMA TKN_STRING
+   21 prog_parm: K_ID TKN_EQUAL string_list .
+
+    TKN_COMMA  shift, and go to state 357
+
+    $default  reduce using rule 21 (prog_parm)
+
+
+state 284
+
+   74 prog_parm: K_MISO TKN_EQUAL TKN_TILDE . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 359
+
+
+state 285
+
+   66 prog_parm: K_MISO TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 66 (prog_parm)
+
+
+state 286
+
+   73 prog_parm: K_MOSI TKN_EQUAL TKN_TILDE . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 360
+
+
+state 287
+
+   65 prog_parm: K_MOSI TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 65 (prog_parm)
+
+
+state 288
+
+   77 prog_parm: K_PGMLED TKN_EQUAL TKN_TILDE . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 361
+
+
+state 289
+
+   69 prog_parm: K_PGMLED TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 69 (prog_parm)
+
+
+state 290
+
+   76 prog_parm: K_RDYLED TKN_EQUAL TKN_TILDE . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 362
+
+
+state 291
+
+   68 prog_parm: K_RDYLED TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 68 (prog_parm)
+
+
+state 292
+
+   71 prog_parm: K_RESET TKN_EQUAL TKN_TILDE . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 363
+
+
+state 293
+
+   63 prog_parm: K_RESET TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 63 (prog_parm)
+
+
+state 294
+
+   72 prog_parm: K_SCK TKN_EQUAL TKN_TILDE . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 364
+
+
+state 295
+
+   64 prog_parm: K_SCK TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 64 (prog_parm)
+
+
+state 296
+
+   56 prog_parm: K_USBDEV TKN_EQUAL TKN_STRING .
+
+    $default  reduce using rule 56 (prog_parm)
+
+
+state 297
+
+   59 prog_parm: K_USBSN TKN_EQUAL TKN_STRING .
+
+    $default  reduce using rule 59 (prog_parm)
+
+
+state 298
+
+   58 prog_parm: K_USBPID TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 58 (prog_parm)
+
+
+state 299
+
+   61 prog_parm: K_USBPRODUCT TKN_EQUAL TKN_STRING .
+
+    $default  reduce using rule 61 (prog_parm)
+
+
+state 300
+
+   60 prog_parm: K_USBVENDOR TKN_EQUAL TKN_STRING .
+
+    $default  reduce using rule 60 (prog_parm)
+
+
+state 301
+
+   57 prog_parm: K_USBVID TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 57 (prog_parm)
+
+
+state 302
+
+   30 prog_parm: K_TYPE TKN_EQUAL K_ARDUINO .
+
+    $default  reduce using rule 30 (prog_parm)
+
+
+state 303
+
+   31 prog_parm: K_TYPE TKN_EQUAL K_AVRFTDI .
+
+    $default  reduce using rule 31 (prog_parm)
+
+
+state 304
+
+   32 prog_parm: K_TYPE TKN_EQUAL K_BUSPIRATE .
+
+    $default  reduce using rule 32 (prog_parm)
+
+
+state 305
+
+   47 prog_parm: K_TYPE TKN_EQUAL K_DRAGON_DW .
+
+    $default  reduce using rule 47 (prog_parm)
+
+
+state 306
+
+   48 prog_parm: K_TYPE TKN_EQUAL K_DRAGON_HVSP .
+
+    $default  reduce using rule 48 (prog_parm)
+
+
+state 307
+
+   49 prog_parm: K_TYPE TKN_EQUAL K_DRAGON_ISP .
+
+    $default  reduce using rule 49 (prog_parm)
+
+
+state 308
+
+   50 prog_parm: K_TYPE TKN_EQUAL K_DRAGON_JTAG .
+
+    $default  reduce using rule 50 (prog_parm)
+
+
+state 309
+
+   51 prog_parm: K_TYPE TKN_EQUAL K_DRAGON_PDI .
+
+    $default  reduce using rule 51 (prog_parm)
+
+
+state 310
+
+   52 prog_parm: K_TYPE TKN_EQUAL K_DRAGON_PP .
+
+    $default  reduce using rule 52 (prog_parm)
+
+
+state 311
+
+   41 prog_parm: K_TYPE TKN_EQUAL K_JTAG_MKI .
+
+    $default  reduce using rule 41 (prog_parm)
+
+
+state 312
+
+   42 prog_parm: K_TYPE TKN_EQUAL K_JTAG_MKII .
+
+    $default  reduce using rule 42 (prog_parm)
+
+
+state 313
+
+   43 prog_parm: K_TYPE TKN_EQUAL K_JTAG_MKII_AVR32 .
+
+    $default  reduce using rule 43 (prog_parm)
+
+
+state 314
+
+   44 prog_parm: K_TYPE TKN_EQUAL K_JTAG_MKII_DW .
+
+    $default  reduce using rule 44 (prog_parm)
+
+
+state 315
+
+   45 prog_parm: K_TYPE TKN_EQUAL K_JTAG_MKII_ISP .
+
+    $default  reduce using rule 45 (prog_parm)
+
+
+state 316
+
+   46 prog_parm: K_TYPE TKN_EQUAL K_JTAG_MKII_PDI .
+
+    $default  reduce using rule 46 (prog_parm)
+
+
+state 317
+
+   22 prog_parm: K_TYPE TKN_EQUAL K_PAR .
+
+    $default  reduce using rule 22 (prog_parm)
+
+
+state 318
+
+   23 prog_parm: K_TYPE TKN_EQUAL K_SERBB .
+
+    $default  reduce using rule 23 (prog_parm)
+
+
+state 319
+
+   24 prog_parm: K_TYPE TKN_EQUAL K_STK500 .
+
+    $default  reduce using rule 24 (prog_parm)
+
+
+state 320
+
+   27 prog_parm: K_TYPE TKN_EQUAL K_STK500HVSP .
+
+    $default  reduce using rule 27 (prog_parm)
+
+
+state 321
+
+   28 prog_parm: K_TYPE TKN_EQUAL K_STK500PP .
+
+    $default  reduce using rule 28 (prog_parm)
+
+
+state 322
+
+   25 prog_parm: K_TYPE TKN_EQUAL K_STK500V2 .
+
+    $default  reduce using rule 25 (prog_parm)
+
+
+state 323
+
+   29 prog_parm: K_TYPE TKN_EQUAL K_STK500GENERIC .
+
+    $default  reduce using rule 29 (prog_parm)
+
+
+state 324
+
+   33 prog_parm: K_TYPE TKN_EQUAL K_STK600 .
+
+    $default  reduce using rule 33 (prog_parm)
+
+
+state 325
+
+   34 prog_parm: K_TYPE TKN_EQUAL K_STK600HVSP .
+
+    $default  reduce using rule 34 (prog_parm)
+
+
+state 326
+
+   35 prog_parm: K_TYPE TKN_EQUAL K_STK600PP .
+
+    $default  reduce using rule 35 (prog_parm)
+
+
+state 327
+
+   36 prog_parm: K_TYPE TKN_EQUAL K_AVR910 .
+
+    $default  reduce using rule 36 (prog_parm)
+
+
+state 328
+
+   37 prog_parm: K_TYPE TKN_EQUAL K_USBASP .
+
+    $default  reduce using rule 37 (prog_parm)
+
+
+state 329
+
+   38 prog_parm: K_TYPE TKN_EQUAL K_USBTINY .
+
+    $default  reduce using rule 38 (prog_parm)
+
+
+state 330
+
+   39 prog_parm: K_TYPE TKN_EQUAL K_BUTTERFLY .
+
+    $default  reduce using rule 39 (prog_parm)
+
+
+state 331
+
+   40 prog_parm: K_TYPE TKN_EQUAL K_BUTTERFLY_MK .
+
+    $default  reduce using rule 40 (prog_parm)
+
+
+state 332
+
+   26 prog_parm: K_TYPE TKN_EQUAL K_WIRING .
+
+    $default  reduce using rule 26 (prog_parm)
+
+
+state 333
+
+   18 num_list: num_list . TKN_COMMA TKN_NUMBER
+   54 prog_parm: K_VCC TKN_EQUAL num_list .
+
+    TKN_COMMA  shift, and go to state 356
+
+    $default  reduce using rule 54 (prog_parm)
+
+
+state 334
+
+   78 prog_parm: K_VFYLED TKN_EQUAL TKN_TILDE . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 365
+
+
+state 335
+
+   70 prog_parm: K_VFYLED TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 70 (prog_parm)
+
+
+state 336
+
+   20 prog_parms: prog_parms prog_parm TKN_SEMI .
+
+    $default  reduce using rule 20 (prog_parms)
+
+
+state 337
+
+  165 mem_spec: K_PAGE_SIZE . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 366
+
+
+state 338
+
+  163 mem_spec: K_PAGED . TKN_EQUAL yesno
+
+    TKN_EQUAL  shift, and go to state 367
+
+
+state 339
+
+  169 mem_spec: K_MAX_WRITE_DELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 368
+
+
+state 340
+
+  168 mem_spec: K_MIN_WRITE_DELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 369
+
+
+state 341
+
+  166 mem_spec: K_NUM_PAGES . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 370
+
+
+state 342
+
+  167 mem_spec: K_OFFSET . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 371
+
+
+state 343
+
+  170 mem_spec: K_PWROFF_AFTER_WRITE . TKN_EQUAL yesno
+
+    TKN_EQUAL  shift, and go to state 372
+
+
+state 344
+
+  171 mem_spec: K_READBACK_P1 . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 373
+
+
+state 345
+
+  172 mem_spec: K_READBACK_P2 . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 374
+
+
+state 346
+
+  164 mem_spec: K_SIZE . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 375
+
+
+state 347
+
+  177 mem_spec: K_POLLINDEX . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 376
+
+
+state 348
+
+  173 mem_spec: K_MODE . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 377
+
+
+state 349
+
+  174 mem_spec: K_DELAY . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 378
+
+
+state 350
+
+  175 mem_spec: K_BLOCKSIZE . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 379
+
+
+state 351
+
+  176 mem_spec: K_READSIZE . TKN_EQUAL TKN_NUMBER
+
+    TKN_EQUAL  shift, and go to state 380
+
+
+state 352
+
+  178 mem_spec: opcode . TKN_EQUAL string_list
+
+    TKN_EQUAL  shift, and go to state 381
+
+
+state 353
+
+  157 part_parm: K_MEMORY TKN_STRING @3 mem_specs .
+  162 mem_specs: mem_specs . mem_spec TKN_SEMI
+
+    K_READ                shift, and go to state 26
+    K_WRITE               shift, and go to state 27
+    K_READ_LO             shift, and go to state 28
+    K_READ_HI             shift, and go to state 29
+    K_WRITE_LO            shift, and go to state 30
+    K_WRITE_HI            shift, and go to state 31
+    K_LOADPAGE_LO         shift, and go to state 32
+    K_LOADPAGE_HI         shift, and go to state 33
+    K_LOAD_EXT_ADDR       shift, and go to state 34
+    K_WRITEPAGE           shift, and go to state 35
+    K_CHIP_ERASE          shift, and go to state 36
+    K_PGM_ENABLE          shift, and go to state 37
+    K_PAGE_SIZE           shift, and go to state 337
+    K_PAGED               shift, and go to state 338
+    K_MAX_WRITE_DELAY     shift, and go to state 339
+    K_MIN_WRITE_DELAY     shift, and go to state 340
+    K_NUM_PAGES           shift, and go to state 341
+    K_OFFSET              shift, and go to state 342
+    K_PWROFF_AFTER_WRITE  shift, and go to state 343
+    K_READBACK_P1         shift, and go to state 344
+    K_READBACK_P2         shift, and go to state 345
+    K_SIZE                shift, and go to state 346
+    K_POLLINDEX           shift, and go to state 347
+    K_MODE                shift, and go to state 348
+    K_DELAY               shift, and go to state 349
+    K_BLOCKSIZE           shift, and go to state 350
+    K_READSIZE            shift, and go to state 351
+
+    $default  reduce using rule 157 (part_parm)
+
+    opcode    go to state 352
+    mem_spec  go to state 382
+
+
+state 354
+
+  161 mem_specs: mem_spec . TKN_SEMI
+
+    TKN_SEMI  shift, and go to state 383
+
+
+state 355
+
+  104 part_parm: K_SIGNATURE TKN_EQUAL TKN_NUMBER TKN_NUMBER . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 384
+
+
+state 356
+
+   18 num_list: num_list TKN_COMMA . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 385
+
+
+state 357
+
+   16 string_list: string_list TKN_COMMA . TKN_STRING
+
+    TKN_STRING  shift, and go to state 386
+
+
+state 358
+
+   75 prog_parm: K_ERRLED TKN_EQUAL TKN_TILDE TKN_NUMBER .
+
+    $default  reduce using rule 75 (prog_parm)
+
+
+state 359
+
+   74 prog_parm: K_MISO TKN_EQUAL TKN_TILDE TKN_NUMBER .
+
+    $default  reduce using rule 74 (prog_parm)
+
+
+state 360
+
+   73 prog_parm: K_MOSI TKN_EQUAL TKN_TILDE TKN_NUMBER .
+
+    $default  reduce using rule 73 (prog_parm)
+
+
+state 361
+
+   77 prog_parm: K_PGMLED TKN_EQUAL TKN_TILDE TKN_NUMBER .
+
+    $default  reduce using rule 77 (prog_parm)
+
+
+state 362
+
+   76 prog_parm: K_RDYLED TKN_EQUAL TKN_TILDE TKN_NUMBER .
+
+    $default  reduce using rule 76 (prog_parm)
+
+
+state 363
+
+   71 prog_parm: K_RESET TKN_EQUAL TKN_TILDE TKN_NUMBER .
+
+    $default  reduce using rule 71 (prog_parm)
+
+
+state 364
+
+   72 prog_parm: K_SCK TKN_EQUAL TKN_TILDE TKN_NUMBER .
+
+    $default  reduce using rule 72 (prog_parm)
+
+
+state 365
+
+   78 prog_parm: K_VFYLED TKN_EQUAL TKN_TILDE TKN_NUMBER .
+
+    $default  reduce using rule 78 (prog_parm)
+
+
+state 366
+
+  165 mem_spec: K_PAGE_SIZE TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 387
+
+
+state 367
+
+  163 mem_spec: K_PAGED TKN_EQUAL . yesno
+
+    K_NO   shift, and go to state 219
+    K_YES  shift, and go to state 220
+
+    yesno  go to state 388
+
+
+state 368
+
+  169 mem_spec: K_MAX_WRITE_DELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 389
+
+
+state 369
+
+  168 mem_spec: K_MIN_WRITE_DELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 390
+
+
+state 370
+
+  166 mem_spec: K_NUM_PAGES TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 391
+
+
+state 371
+
+  167 mem_spec: K_OFFSET TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 392
+
+
+state 372
+
+  170 mem_spec: K_PWROFF_AFTER_WRITE TKN_EQUAL . yesno
+
+    K_NO   shift, and go to state 219
+    K_YES  shift, and go to state 220
+
+    yesno  go to state 393
+
+
+state 373
+
+  171 mem_spec: K_READBACK_P1 TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 394
+
+
+state 374
+
+  172 mem_spec: K_READBACK_P2 TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 395
+
+
+state 375
+
+  164 mem_spec: K_SIZE TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 396
+
+
+state 376
+
+  177 mem_spec: K_POLLINDEX TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 397
+
+
+state 377
+
+  173 mem_spec: K_MODE TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 398
+
+
+state 378
+
+  174 mem_spec: K_DELAY TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 399
+
+
+state 379
+
+  175 mem_spec: K_BLOCKSIZE TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 400
+
+
+state 380
+
+  176 mem_spec: K_READSIZE TKN_EQUAL . TKN_NUMBER
+
+    TKN_NUMBER  shift, and go to state 401
+
+
+state 381
+
+  178 mem_spec: opcode TKN_EQUAL . string_list
+
+    TKN_STRING  shift, and go to state 275
+
+    string_list  go to state 402
+
+
+state 382
+
+  162 mem_specs: mem_specs mem_spec . TKN_SEMI
+
+    TKN_SEMI  shift, and go to state 403
+
+
+state 383
+
+  161 mem_specs: mem_spec TKN_SEMI .
+
+    $default  reduce using rule 161 (mem_specs)
+
+
+state 384
+
+  104 part_parm: K_SIGNATURE TKN_EQUAL TKN_NUMBER TKN_NUMBER TKN_NUMBER .
+
+    $default  reduce using rule 104 (part_parm)
+
+
+state 385
+
+   18 num_list: num_list TKN_COMMA TKN_NUMBER .
+
+    $default  reduce using rule 18 (num_list)
+
+
+state 386
+
+   16 string_list: string_list TKN_COMMA TKN_STRING .
+
+    $default  reduce using rule 16 (string_list)
+
+
+state 387
+
+  165 mem_spec: K_PAGE_SIZE TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 165 (mem_spec)
+
+
+state 388
+
+  163 mem_spec: K_PAGED TKN_EQUAL yesno .
+
+    $default  reduce using rule 163 (mem_spec)
+
+
+state 389
+
+  169 mem_spec: K_MAX_WRITE_DELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 169 (mem_spec)
+
+
+state 390
+
+  168 mem_spec: K_MIN_WRITE_DELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 168 (mem_spec)
+
+
+state 391
+
+  166 mem_spec: K_NUM_PAGES TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 166 (mem_spec)
+
+
+state 392
+
+  167 mem_spec: K_OFFSET TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 167 (mem_spec)
+
+
+state 393
+
+  170 mem_spec: K_PWROFF_AFTER_WRITE TKN_EQUAL yesno .
+
+    $default  reduce using rule 170 (mem_spec)
+
+
+state 394
+
+  171 mem_spec: K_READBACK_P1 TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 171 (mem_spec)
+
+
+state 395
+
+  172 mem_spec: K_READBACK_P2 TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 172 (mem_spec)
+
+
+state 396
+
+  164 mem_spec: K_SIZE TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 164 (mem_spec)
+
+
+state 397
+
+  177 mem_spec: K_POLLINDEX TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 177 (mem_spec)
+
+
+state 398
+
+  173 mem_spec: K_MODE TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 173 (mem_spec)
+
+
+state 399
+
+  174 mem_spec: K_DELAY TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 174 (mem_spec)
+
+
+state 400
+
+  175 mem_spec: K_BLOCKSIZE TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 175 (mem_spec)
+
+
+state 401
+
+  176 mem_spec: K_READSIZE TKN_EQUAL TKN_NUMBER .
+
+    $default  reduce using rule 176 (mem_spec)
+
+
+state 402
+
+   16 string_list: string_list . TKN_COMMA TKN_STRING
+  178 mem_spec: opcode TKN_EQUAL string_list .
+
+    TKN_COMMA  shift, and go to state 357
+
+    $default  reduce using rule 178 (mem_spec)
+
+
+state 403
+
+  162 mem_specs: mem_specs mem_spec TKN_SEMI .
+
+    $default  reduce using rule 162 (mem_specs)
