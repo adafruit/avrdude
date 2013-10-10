@@ -454,10 +454,8 @@ static int usbtiny_chip_erase(PROGRAMMER * pgm, AVRPART * p)
   usleep( p->chip_erase_delay );
   if (is_trinket) {
     // this delay cannot be too short or too long
-    usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF );
-    usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF );
-    usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF );
-    usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF );
+    //usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF );
+    //usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF ); usleep( 0x7FFF );
     // too short and the chip won't have enough time to do the erase
     // too long and the bootloader will timeout
   }
