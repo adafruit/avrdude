@@ -73,6 +73,7 @@ struct pdata
 #define PDATA(pgm) ((struct pdata *)(pgm->cookie))
 
 static char is_trinket = 0; // =1 if Trinket bootloader setting is detected (detection via extra long chip erase time set in avrdude.conf)
+#define TRINKET_CHIPERASE_DELAY 10000
 
 // ----------------------------------------------------------------------
 
@@ -348,7 +349,7 @@ static int usbtiny_initialize (PROGRAMMER *pgm, AVRPART *p )
 {
   unsigned char res[4];        // store the response from usbtinyisp
 
-  is_trinket = p->chip_erase_delay > 5000; // Trinket has a extra long chip erase delay setting in avrdude.conf
+  is_trinket = p->chip_erase_delay > TRINKET_CHIPERASE_DELAY; // Trinket has a extra long chip erase delay setting in avrdude.conf
   if (is_trinket) { // skip most of the initialization steps because it's the Trinket bootloader
     fprintf(stderr, "\n\n%s: TRINKET BOOTLOADER SELECTED\n\n", progname);
     PDATA(pgm)->sck_period = SCK_DEFAULT;
