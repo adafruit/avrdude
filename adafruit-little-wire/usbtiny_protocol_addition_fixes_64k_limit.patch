@@ -1,0 +1,155 @@
+Index: usbtiny.c
+===================================================================
+--- usbtiny.c	(revision 1324)
++++ usbtiny.c	(working copy)
+@@ -427,10 +427,21 @@
+ }
+ 
+ // These are required functions but don't actually do anything
+-static	void	usbtiny_enable ( PROGRAMMER* pgm ) {}
++static void usbtiny_enable ( PROGRAMMER* pgm ) {}
+ 
+ static void usbtiny_disable ( PROGRAMMER* pgm ) {}
+ 
++/* usbtiny has a bug that prevents it from downloading more than 64K of flash
++ * one reason is that it never implements extended addresses
++*/
++static int usbtiny_load_ext_addr(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m, unsigned int ext_addr)
++{
++	unsigned char cmdbuf[4], resbuf[4];
++	// "load extended address" SPI command
++	cmdbuf[0] = 0x4D; cmdbuf[1] = 0x00; cmdbuf[3] = 0x00;
++	cmdbuf[2] = ext_addr & 0xFF;
++	return usbtiny_cmd(pgm, cmdbuf, resbuf);
++}
+ 
+ /* To speed up programming and reading, we do a 'chunked' read.
+  *  We request just the data itself and the USBtiny uses the SPI function
+@@ -444,8 +455,9 @@
+   unsigned int maxaddr = addr + n_bytes;
+   int chunk;
+   int function;
++  int addr_adjusted, addr_ext;
++  static int addr_ext_old = -1;
+ 
+-
+   // First determine what we're doing
+   if (strcmp( m->desc, "flash" ) == 0) {
+     function = USBTINY_FLASH_READ;
+@@ -456,12 +468,45 @@
+   for (; addr < maxaddr; addr += chunk) {
+     chunk = PDATA(pgm)->chunk_size;         // start with the maximum chunk size possible
+ 
++    /*
++    one reason why the first USBtiny protocol was limited to 64K of flash
++    is because the address sent is a byte address, not a word address,
++    and it is packed into 16 bits
++
++    also, there wasn't anything to send the "load extended address" command
++
++    so to fix it, we add an extra room to paged writes and reads by shifting
++    the address before sending it, and implement the load extended address
++    command with a SPI command.
++
++    the firmware must also be updated so that it knows how to handle the shifted
++    address.
++    */
++
++    addr_adjusted = addr;
++
++    if (function == USBTINY_FLASH_READ && addr > 0xFFFF) {
++      function = USBTINY_FLASH_READ_FAR;
++    }
++
++    if (function == USBTINY_FLASH_READ_FAR) {
++      addr_adjusted = addr >> 1; // add extra bit
++      addr_ext = (addr_adjusted & 0xFF0000) >> 16; // calculate the extended address if it is outside the lower 16 bits
++      if (addr_ext_old != addr_ext) {
++        // we only need to send an extended address only when it changes
++        addr_ext_old = addr_ext;
++        if (usbtiny_load_ext_addr(pgm, p, m, addr_ext) < 0) {
++          return -1;
++        }
++      }
++    }
++
+     // Send the chunk of data to the USBtiny with the function we want
+     // to perform
+     if (usb_in(pgm,
+ 	       function,          // EEPROM or flash
+ 	       0,                 // delay between SPI commands
+-	       addr,              // address in memory
++	       addr_adjusted,     // address in memory
+ 	       m->buf + addr,     // pointer to where we store data
+ 	       chunk,             // number of bytes
+ 	       32 * PDATA(pgm)->sck_period)  // each byte gets turned into a 4-byte SPI cmd
+@@ -489,6 +534,8 @@
+   int next;
+   int function;     // which SPI command to use
+   int delay;        // delay required between SPI commands
++  int addr_adjusted, addr_ext;
++  static int addr_ext_old = -1;
+ 
+   // First determine what we're doing
+   if (strcmp( m->desc, "flash" ) == 0) {
+@@ -515,10 +562,43 @@
+     if (m->paged && chunk > page_size)
+       chunk = page_size;
+ 
++    /*
++    one reason why the first USBtiny protocol was limited to 64K of flash
++    is because the address sent is a byte address, not a word address,
++    and it is packed into 16 bits
++
++    also, there wasn't anything to send the "load extended address" command
++
++    so to fix it, we add an extra room to paged writes and reads by shifting
++    the address before sending it, and implement the load extended address
++    command with a SPI command.
++
++    the firmware must also be updated so that it knows how to handle the shifted
++    address.
++    */
++
++    addr_adjusted = addr;
++
++    if (function == USBTINY_FLASH_WRITE && addr > 0xFFFF) {
++      function = USBTINY_FLASH_WRITE_FAR;
++    }
++
++    if (function == USBTINY_FLASH_WRITE_FAR) {
++      addr_adjusted = addr >> 1; // add extra bit
++      addr_ext = (addr_adjusted & 0xFF0000) >> 16; // calculate the extended address if it is outside the lower 16 bits
++      if (addr_ext_old != addr_ext) {
++        // we only need to send an extended address only when it changes
++        addr_ext_old = addr_ext;
++        if (usbtiny_load_ext_addr(pgm, p, m, addr_ext) < 0) {
++          return -1;
++        }
++      }
++    }
++
+     if (usb_out(pgm,
+ 		function,       // Flash or EEPROM
+ 		delay,          // How much to wait between each byte
+-		addr,           // Address in memory
++		addr_adjusted,  // Address in memory
+ 		m->buf + addr,  // Pointer to data
+ 		chunk,          // Number of bytes to write
+ 		32 * PDATA(pgm)->sck_period + delay  // each byte gets turned into a
+Index: usbtiny.h
+===================================================================
+--- usbtiny.h	(revision 1324)
++++ usbtiny.h	(working copy)
+@@ -36,9 +36,10 @@
+ #define	USBTINY_FLASH_WRITE  10	    // write flash (wIndex:address, wValue:timeout)
+ #define	USBTINY_EEPROM_READ  11	    // read eeprom (wIndex:address)
+ #define	USBTINY_EEPROM_WRITE 12	    // write eeprom (wIndex:address, wValue:timeout)
++#define	USBTINY_FLASH_READ_FAR   35	    // read flash, address shifted (wIndex:address)
++#define	USBTINY_FLASH_WRITE_FAR  36	    // write flash, address shifted (wIndex:address, wValue:timeout)
+ 
+ 
+-
+ // Flags to indicate how to set RESET on power up
+ #define	RESET_LOW	0
+ #define	RESET_HIGH	1
