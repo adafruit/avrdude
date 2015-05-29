@@ -14,11 +14,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: ser_posix.c 949 2010-10-22 14:44:53Z springob $ */
+/* $Id: ser_posix.c 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 /*
  * Posix serial interface for avrdude.
@@ -62,9 +61,15 @@ static struct baud_mapping baud_lookup_table [] = {
   { 9600,   B9600 },
   { 19200,  B19200 },
   { 38400,  B38400 },
+#ifdef B57600
   { 57600,  B57600 },
+#endif
+#ifdef B115200
   { 115200, B115200 },
+#endif
+#ifdef B230400
   { 230400, B230400 },
+#endif
   { 0,      0 }                 /* Terminator. */
 };
 
@@ -248,7 +253,7 @@ static int ser_set_dtr_rts(union filedescriptor *fdp, int is_on)
   return 0;
 }
 
-static int ser_open(char * port, long baud, union filedescriptor *fdp)
+static int ser_open(char * port, union pinfo pinfo, union filedescriptor *fdp)
 {
   int rc;
   int fd;
@@ -276,7 +281,7 @@ static int ser_open(char * port, long baud, union filedescriptor *fdp)
   /*
    * set serial line attributes
    */
-  rc = ser_setspeed(fdp, baud);
+  rc = ser_setspeed(fdp, pinfo.baud);
   if (rc) {
     fprintf(stderr, 
             "%s: ser_open(): can't set attributes for device \"%s\": %s\n",
@@ -309,7 +314,6 @@ static void ser_close(union filedescriptor *fd)
 
 static int ser_send(union filedescriptor *fd, unsigned char * buf, size_t buflen)
 {
-  struct timeval timeout, to2;
   int rc;
   unsigned char * p = buf;
   size_t len = buflen;
@@ -337,10 +341,6 @@ static int ser_send(union filedescriptor *fd, unsigned char * buf, size_t buflen
 
       fprintf(stderr, "\n");
   }
-
-  timeout.tv_sec = 0;
-  timeout.tv_usec = 500000;
-  to2 = timeout;
 
   while (len) {
     rc = write(fd->ifd, p, (len > 1024) ? 1024 : len);

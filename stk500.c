@@ -1,7 +1,7 @@
 /*
  * avrdude - A Downloader/Uploader for AVR device programmers
  * Copyright (C) 2002-2004 Brian S. Dean <bsd@bsdhome.com>
- * Copyright (C) 2008 Joerg Wunsch
+ * Copyright (C) 2008,2014 Joerg Wunsch
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,11 +14,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: stk500.c 1007 2011-09-14 21:49:42Z joerg_wunsch $ */
+/* $Id: stk500.c 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 /*
  * avrdude interface for Atmel STK500 programmer
@@ -40,10 +39,21 @@
 #include "avrdude.h"
 #include "avr.h"
 #include "pgm.h"
+#include "stk500.h"
 #include "stk500_private.h"
 #include "serial.h"
 
 #define STK500_XTAL 7372800U
+#define MAX_SYNC_ATTEMPTS 10
+
+struct pdata
+{
+  unsigned char ext_addr_byte; /* Record ext-addr byte set in the
+				* target device (if used) */
+};
+
+#define PDATA(pgm) ((struct pdata *)(pgm->cookie))
+
 
 static int stk500_getparm(PROGRAMMER * pgm, unsigned parm, unsigned * value);
 static int stk500_setparm(PROGRAMMER * pgm, unsigned parm, unsigned value);
@@ -80,6 +90,7 @@ int stk500_drain(PROGRAMMER * pgm, int display)
 int stk500_getsync(PROGRAMMER * pgm)
 {
   unsigned char buf[32], resp[32];
+  int attempt;
 
   /*
    * get in sync */
@@ -95,13 +106,17 @@ int stk500_getsync(PROGRAMMER * pgm)
   stk500_send(pgm, buf, 2);
   stk500_drain(pgm, 0);
 
-  stk500_send(pgm, buf, 2);
-  if (stk500_recv(pgm, resp, 1) < 0)
-    return -1;
-  if (resp[0] != Resp_STK_INSYNC) {
-    fprintf(stderr, 
-            "%s: stk500_getsync(): not in sync: resp=0x%02x\n",
-            progname, resp[0]);
+  for (attempt = 0; attempt < MAX_SYNC_ATTEMPTS; attempt++) {
+    stk500_send(pgm, buf, 2);
+    stk500_recv(pgm, resp, 1);
+    if (resp[0] == Resp_STK_INSYNC){
+      break;
+    }
+    fprintf(stderr,
+            "%s: stk500_getsync() attempt %d of %d: not in sync: resp=0x%02x\n",
+            progname, attempt + 1, MAX_SYNC_ATTEMPTS, resp[0]);
+  }
+  if (attempt == MAX_SYNC_ATTEMPTS) {
     stk500_drain(pgm, 0);
     return -1;
   }
@@ -124,8 +139,8 @@ int stk500_getsync(PROGRAMMER * pgm)
  * transmit an AVR device command and return the results; 'cmd' and
  * 'res' must point to at least a 4 byte data buffer
  */
-static int stk500_cmd(PROGRAMMER * pgm, unsigned char cmd[4],
-                      unsigned char res[4])
+static int stk500_cmd(PROGRAMMER * pgm, const unsigned char *cmd,
+                      unsigned char *res)
 {
   unsigned char buf[32];
 
@@ -558,37 +573,40 @@ static int stk500_initialize(PROGRAMMER * pgm, AVRPART * p)
 
   if (n_extparms) {
     if ((p->pagel == 0) || (p->bs2 == 0)) {
-      fprintf(stderr, 
-              "%s: please define PAGEL and BS2 signals in the configuration "
-              "file for part %s\n", 
-              progname, p->desc);
+      if (verbose > 1)
+          fprintf(stderr,
+                  "%s: PAGEL and BS2 signals not defined in the configuration "
+                  "file for part %s, using dummy values\n",
+                  progname, p->desc);
+      buf[2] = 0xD7;            /* they look somehow possible, */
+      buf[3] = 0xA0;            /* don't they? ;) */
     }
     else {
-      buf[0] = n_extparms+1;
-
-      /*
-       * m is currently pointing to eeprom memory if the part has it
-       */
-      if (m)
-        buf[1] = m->page_size;
-      else
-        buf[1] = 0;
-      
       buf[2] = p->pagel;
       buf[3] = p->bs2;
-      
-      if (n_extparms == 4) {
-        if (p->reset_disposition == RESET_DEDICATED)
-          buf[4] = 0;
-        else
-          buf[4] = 1;
-      }
-      
-      rc = stk500_set_extended_parms(pgm, n_extparms+1, buf);
-      if (rc) {
-        fprintf(stderr, "%s: stk500_initialize(): failed\n", progname);
-        exit(1);
-      }
+    }
+    buf[0] = n_extparms+1;
+
+    /*
+     * m is currently pointing to eeprom memory if the part has it
+     */
+    if (m)
+      buf[1] = m->page_size;
+    else
+      buf[1] = 0;
+
+
+    if (n_extparms == 4) {
+      if (p->reset_disposition == RESET_DEDICATED)
+        buf[4] = 0;
+      else
+        buf[4] = 1;
+    }
+
+    rc = stk500_set_extended_parms(pgm, n_extparms+1, buf);
+    if (rc) {
+      fprintf(stderr, "%s: stk500_initialize(): failed\n", progname);
+      exit(1);
     }
   }
 
@@ -654,8 +672,10 @@ static void stk500_enable(PROGRAMMER * pgm)
 
 static int stk500_open(PROGRAMMER * pgm, char * port)
 {
+  union pinfo pinfo;
   strcpy(pgm->port, port);
-  if (serial_open(port, pgm->baudrate? pgm->baudrate: 115200, &pgm->fd)==-1) {
+  pinfo.baud = pgm->baudrate? pgm->baudrate: 115200;
+  if (serial_open(port, pinfo, &pgm->fd)==-1) {
     return -1;
   }
 
@@ -687,14 +707,31 @@ static void stk500_close(PROGRAMMER * pgm)
 }
 
 
-static int stk500_loadaddr(PROGRAMMER * pgm, unsigned int addr)
+static int stk500_loadaddr(PROGRAMMER * pgm, AVRMEM * mem, unsigned int addr)
 {
   unsigned char buf[16];
   int tries;
+  unsigned char ext_byte;
+  OPCODE * lext;
 
   tries = 0;
  retry:
   tries++;
+
+  /* To support flash > 64K words the correct Extended Address Byte is needed */
+  lext = mem->op[AVR_OP_LOAD_EXT_ADDR];
+  if (lext != NULL) {
+    ext_byte = (addr >> 16) & 0xff;
+    if (ext_byte != PDATA(pgm)->ext_addr_byte) {
+      /* Either this is the first addr load, or a 64K word boundary is
+       * crossed, so set the ext addr byte */
+      avr_set_bits(lext, buf);
+      avr_set_addr(lext, buf, addr);
+      stk500_cmd(pgm, buf, buf);
+      PDATA(pgm)->ext_addr_byte = ext_byte;
+    }
+  }
+
   buf[0] = Cmnd_STK_LOAD_ADDRESS;
   buf[1] = addr & 0xff;
   buf[2] = (addr >> 8) & 0xff;
@@ -748,15 +785,12 @@ static int stk500_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
   int tries;
   unsigned int n;
   unsigned int i;
-  int flash;
 
   if (strcmp(m->desc, "flash") == 0) {
     memtype = 'F';
-    flash = 1;
   }
   else if (strcmp(m->desc, "eeprom") == 0) {
     memtype = 'E';
-    flash = 0;
   }
   else {
     return -2;
@@ -790,7 +824,7 @@ static int stk500_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
     tries = 0;
   retry:
     tries++;
-    stk500_loadaddr(pgm, addr/a_div);
+    stk500_loadaddr(pgm, m, addr/a_div);
 
     /* build command block and avoid multiple send commands as it leads to a crash
         of the silabs usb serial driver on mac os x */
@@ -879,7 +913,7 @@ static int stk500_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
     tries = 0;
   retry:
     tries++;
-    stk500_loadaddr(pgm, addr/a_div);
+    stk500_loadaddr(pgm, m, addr/a_div);
     buf[0] = Cmnd_STK_READ_PAGE;
     buf[1] = (block_size >> 8) & 0xff;
     buf[2] = block_size & 0xff;
@@ -1270,6 +1304,25 @@ static void stk500_print_parms(PROGRAMMER * pgm)
   stk500_print_parms1(pgm, "");
 }
 
+static void stk500_setup(PROGRAMMER * pgm)
+{
+  if ((pgm->cookie = malloc(sizeof(struct pdata))) == 0) {
+    fprintf(stderr,
+	    "%s: stk500_setup(): Out of memory allocating private data\n",
+	    progname);
+    exit(1);
+  }
+  memset(pgm->cookie, 0, sizeof(struct pdata));
+  PDATA(pgm)->ext_addr_byte = 0xff; /* Ensures it is programmed before
+				     * first memory address */
+}
+
+static void stk500_teardown(PROGRAMMER * pgm)
+{
+  free(pgm->cookie);
+}
+
+const char stk500_desc[] = "Atmel STK500 Version 1.x firmware";
 
 void stk500_initpgm(PROGRAMMER * pgm)
 {
@@ -1300,5 +1353,7 @@ void stk500_initpgm(PROGRAMMER * pgm)
   pgm->set_varef      = stk500_set_varef;
   pgm->set_fosc       = stk500_set_fosc;
   pgm->set_sck_period = stk500_set_sck_period;
+  pgm->setup          = stk500_setup;
+  pgm->teardown       = stk500_teardown;
   pgm->page_size      = 256;
 }

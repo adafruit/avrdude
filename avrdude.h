@@ -13,11 +13,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: avrdude.h 936 2010-01-22 16:40:17Z joerg_wunsch $ */
+/* $Id: avrdude.h 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 #ifndef avrdude_h
 #define avrdude_h
@@ -25,7 +24,6 @@
 extern char * progname;		/* name of program, for messages */
 extern char progbuf[];		/* spaces same length as progname */
 
-extern int do_cycles;		/* track erase-rewrite cycles (-y) */
 extern int ovsigck;		/* override signature check (-F) */
 extern int verbose;		/* verbosity level (-v, -vv, ...) */
 extern int quell_progress;	/* quiteness level (-q, -qq) */
@@ -46,11 +44,11 @@ int usleep(unsigned int us);
 #if !defined(HAVE_GETTIMEOFDAY)
 struct timezone;
 int gettimeofday(struct timeval *tv, struct timezone *tz);
+#endif /* HAVE_GETTIMEOFDAY */
+
 #ifdef __cplusplus
 }
 #endif
-#endif /* HAVE_GETTIMEOFDAY */
-
 #endif /* defined(WIN32NATIVE) */
 
 #endif

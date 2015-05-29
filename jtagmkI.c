@@ -13,11 +13,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: jtagmkI.c 1007 2011-09-14 21:49:42Z joerg_wunsch $ */
+/* $Id: jtagmkI.c 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 /*
  * avrdude interface for Atmel JTAG ICE (mkI) programmer
@@ -37,6 +36,7 @@
 #include "avr.h"
 #include "crc16.h"
 #include "pgm.h"
+#include "jtagmkI.h"
 #include "jtagmkI_private.h"
 #include "serial.h"
 
@@ -153,7 +153,7 @@ static void jtagmkI_prmsg(PROGRAMMER * pgm, unsigned char * data, size_t len)
       if (i % 16 == 15)
 	putc('\n', stderr);
       else
-	putchar(' ');
+	putc(' ', stderr);
     }
     if (i % 16 != 0)
       putc('\n', stderr);
@@ -669,11 +669,13 @@ static int jtagmkI_open(PROGRAMMER * pgm, char * port)
   PDATA(pgm)->initial_baudrate = -1L;
 
   for (i = 0; i < sizeof(baudtab) / sizeof(baudtab[0]); i++) {
+    union pinfo pinfo;
+    pinfo.baud = baudtab[i].baud;
     if (verbose >= 2)
       fprintf(stderr,
               "%s: jtagmkI_open(): trying to sync at baud rate %ld:\n",
-              progname, baudtab[i].baud);
-    if (serial_open(port, baudtab[i].baud, &pgm->fd)==-1) {
+              progname, pinfo.baud);
+    if (serial_open(port, pinfo, &pgm->fd)==-1) {
       return -1;
     }
 
@@ -1372,6 +1374,7 @@ static void jtagmkI_print_parms(PROGRAMMER * pgm)
   jtagmkI_print_parms1(pgm, "");
 }
 
+const char jtagmkI_desc[] = "Atmel JTAG ICE mkI";
 
 void jtagmkI_initpgm(PROGRAMMER * pgm)
 {

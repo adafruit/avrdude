@@ -13,11 +13,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: lists.h 722 2007-01-24 22:43:46Z joerg_wunsch $ */
+/* $Id: lists.h 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 /*----------------------------------------------------------------------
   Id: lists.h,v 1.2 2001/08/19 23:13:17 bsd Exp $
@@ -75,7 +74,7 @@ extern "C" {
 
 LISTID     lcreat      ( void * liststruct, int poolsize );
 void       ldestroy    ( LISTID lid );
-void       ldestroy_cb ( LISTID lid, void (*ucleanup)() );
+void       ldestroy_cb ( LISTID lid, void (*ucleanup)(void * data_ptr) );
 
 LNODEID    lfirst ( LISTID  ); /* head of the list */
 LNODEID    llast  ( LISTID  ); /* tail of the list */
@@ -103,6 +102,8 @@ void     * lrmv_ln ( LISTID lid, LNODEID lnid );
 void     * lrmv_d  ( LISTID lid, void * data_ptr );
 
 LISTID     lcat    ( LISTID lid1, LISTID lid2 );
+
+void       lsort   ( LISTID lid, int (*compare)(void * p1, void * p2));
 
 void     * lsrch   ( LISTID lid, void * p, int (*compare)(void *p1,void *p2));
 

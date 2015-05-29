@@ -17,7 +17,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: jtag3.c 1237 2013-09-17 15:06:35Z joerg_wunsch $ */
+/* $Id: jtag3.c 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 /*
  * avrdude interface for Atmel JTAGICE3 programmer
@@ -84,8 +84,13 @@ struct pdata
 #define PGM_FL_IS_DW		(0x0001)
 #define PGM_FL_IS_PDI           (0x0002)
 #define PGM_FL_IS_JTAG          (0x0004)
+#define PGM_FL_IS_EDBG          (0x0008)
 
 static int jtag3_open(PROGRAMMER * pgm, char * port);
+static int jtag3_edbg_prepare(PROGRAMMER * pgm);
+static int jtag3_edbg_signoff(PROGRAMMER * pgm);
+static int jtag3_edbg_send(PROGRAMMER * pgm, unsigned char * data, size_t len);
+static int jtag3_edbg_recv_frame(PROGRAMMER * pgm, unsigned char **msg);
 
 static int jtag3_initialize(PROGRAMMER * pgm, AVRPART * p);
 static int jtag3_chip_erase(PROGRAMMER * pgm, AVRPART * p);
@@ -399,6 +404,9 @@ int jtag3_send(PROGRAMMER * pgm, unsigned char * data, size_t len)
 {
   unsigned char *buf;
 
+  if (pgm->flag & PGM_FL_IS_EDBG)
+    return jtag3_edbg_send(pgm, data, len);
+
   if (verbose >= 3)
     fprintf(stderr, "\n%s: jtag3_send(): sending %lu bytes\n",
 	    progname, (unsigned long)len);
@@ -419,10 +427,197 @@ int jtag3_send(PROGRAMMER * pgm, unsigned char * data, size_t len)
     fprintf(stderr,
 	    "%s: jtag3_send(): failed to send command to serial port\n",
 	    progname);
-    exit(1);
+    return -1;
   }
 
   free(buf);
+
+  return 0;
+}
+
+static int jtag3_edbg_send(PROGRAMMER * pgm, unsigned char * data, size_t len)
+{
+  unsigned char buf[USBDEV_MAX_XFER_3];
+  unsigned char status[USBDEV_MAX_XFER_3];
+  int rv;
+
+  if (verbose >= 4)
+    {
+      memset(buf, 0, USBDEV_MAX_XFER_3);
+      memset(status, 0, USBDEV_MAX_XFER_3);
+    }
+
+  if (verbose >= 3)
+    fprintf(stderr, "\n%s: jtag3_edbg_send(): sending %lu bytes\n",
+	    progname, (unsigned long)len);
+
+  if (len + 8 > USBDEV_MAX_XFER_3)
+    {
+      fprintf(stderr,
+	      "%s: jtag3_edbg_send(): Fragmentation not (yet) implemented!\n",
+	      progname);
+      return -1;
+    }
+  buf[0] = EDBG_VENDOR_AVR_CMD;
+  buf[1] = (1 << 4) | 1;	/* first out of a total of 1 fragments */
+  buf[2] = (len + 4) >> 8;
+  buf[3] = (len + 4) & 0xff;
+  buf[4] = TOKEN;
+  buf[5] = 0;                   /* dummy */
+  u16_to_b2(buf + 6, PDATA(pgm)->command_sequence);
+  memcpy(buf + 8, data, len);
+
+  if (serial_send(&pgm->fd, buf, USBDEV_MAX_XFER_3) != 0) {
+    fprintf(stderr,
+	    "%s: jtag3_edbg_send(): failed to send command to serial port\n",
+	    progname);
+    return -1;
+  }
+  rv = serial_recv(&pgm->fd, status, USBDEV_MAX_XFER_3);
+
+  if (rv < 0) {
+    /* timeout in receive */
+    if (verbose > 1)
+      fprintf(stderr,
+	      "%s: jtag3_edbg_send(): Timeout receiving packet\n",
+	      progname);
+    return -1;
+  }
+  if (status[0] != EDBG_VENDOR_AVR_CMD || status[1] != 0x01)
+    {
+      /* what to do in this case? */
+      fprintf(stderr,
+	      "%s: jtag3_edbg_send(): Unexpected response 0x%02x, 0x%02x\n",
+	      progname, status[0], status[1]);
+    }
+
+  return 0;
+}
+
+/*
+ * Send out all the CMSIS-DAP stuff needed to prepare the ICE.
+ */
+static int jtag3_edbg_prepare(PROGRAMMER * pgm)
+{
+  unsigned char buf[USBDEV_MAX_XFER_3];
+  unsigned char status[USBDEV_MAX_XFER_3];
+  int rv;
+
+  if (verbose >= 3)
+    fprintf(stderr, "\n%s: jtag3_edbg_prepare()\n",
+	    progname);
+
+  if (verbose >= 4)
+    memset(buf, 0, USBDEV_MAX_XFER_3);
+
+  buf[0] = CMSISDAP_CMD_CONNECT;
+  buf[1] = CMSISDAP_CONN_SWD;
+  if (serial_send(&pgm->fd, buf, USBDEV_MAX_XFER_3) != 0) {
+    fprintf(stderr,
+	    "%s: jtag3_edbg_prepare(): failed to send command to serial port\n",
+	    progname);
+    return -1;
+  }
+  rv = serial_recv(&pgm->fd, status, USBDEV_MAX_XFER_3);
+  if (rv != USBDEV_MAX_XFER_3) {
+    fprintf(stderr,
+	    "%s: jtag3_edbg_prepare(): failed to read from serial port (%d)\n",
+	    progname, rv);
+    return -1;
+  }
+  if (status[0] != CMSISDAP_CMD_CONNECT ||
+      status[1] == 0)
+    fprintf(stderr,
+	    "%s: jtag3_edbg_prepare(): unexpected response 0x%02x, 0x%02x\n",
+	    progname, status[0], status[1]);
+  if (verbose >= 2)
+    fprintf(stderr,
+	    "%s: jtag3_edbg_prepare(): connection status 0x%02x\n",
+	    progname, status[1]);
+
+  buf[0] = CMSISDAP_CMD_LED;
+  buf[1] = CMSISDAP_LED_CONNECT;
+  buf[2] = 1;
+  if (serial_send(&pgm->fd, buf, USBDEV_MAX_XFER_3) != 0) {
+    fprintf(stderr,
+	    "%s: jtag3_edbg_prepare(): failed to send command to serial port\n",
+	    progname);
+    return -1;
+  }
+  rv = serial_recv(&pgm->fd, status, USBDEV_MAX_XFER_3);
+  if (rv != USBDEV_MAX_XFER_3) {
+    fprintf(stderr,
+	    "%s: jtag3_edbg_prepare(): failed to read from serial port (%d)\n",
+	    progname, rv);
+    return -1;
+  }
+  if (status[0] != CMSISDAP_CMD_LED ||
+      status[1] != 0)
+    fprintf(stderr,
+	    "%s: jtag3_edbg_prepare(): unexpected response 0x%02x, 0x%02x\n",
+	    progname, status[0], status[1]);
+
+  return 0;
+}
+
+
+/*
+ * Send out all the CMSIS-DAP stuff when signing off.
+ */
+static int jtag3_edbg_signoff(PROGRAMMER * pgm)
+{
+  unsigned char buf[USBDEV_MAX_XFER_3];
+  unsigned char status[USBDEV_MAX_XFER_3];
+  int rv;
+
+  if (verbose >= 3)
+    fprintf(stderr, "\n%s: jtag3_edbg_signoff()\n",
+	    progname);
+
+  if (verbose >= 4)
+    memset(buf, 0, USBDEV_MAX_XFER_3);
+
+  buf[0] = CMSISDAP_CMD_LED;
+  buf[1] = CMSISDAP_LED_CONNECT;
+  buf[2] = 0;
+  if (serial_send(&pgm->fd, buf, USBDEV_MAX_XFER_3) != 0) {
+    fprintf(stderr,
+	    "%s: jtag3_edbg_signoff(): failed to send command to serial port\n",
+	    progname);
+    return -1;
+  }
+  rv = serial_recv(&pgm->fd, status, USBDEV_MAX_XFER_3);
+  if (rv != USBDEV_MAX_XFER_3) {
+    fprintf(stderr,
+	    "%s: jtag3_edbg_signoff(): failed to read from serial port (%d)\n",
+	    progname, rv);
+    return -1;
+  }
+  if (status[0] != CMSISDAP_CMD_LED ||
+      status[1] != 0)
+    fprintf(stderr,
+	    "%s: jtag3_edbg_signoff(): unexpected response 0x%02x, 0x%02x\n",
+	    progname, status[0], status[1]);
+
+  buf[0] = CMSISDAP_CMD_DISCONNECT;
+  if (serial_send(&pgm->fd, buf, USBDEV_MAX_XFER_3) != 0) {
+    fprintf(stderr,
+	    "%s: jtag3_edbg_signoff(): failed to send command to serial port\n",
+	    progname);
+    return -1;
+  }
+  rv = serial_recv(&pgm->fd, status, USBDEV_MAX_XFER_3);
+  if (rv != USBDEV_MAX_XFER_3) {
+    fprintf(stderr,
+	    "%s: jtag3_edbg_signoff(): failed to read from serial port (%d)\n",
+	    progname, rv);
+    return -1;
+  }
+  if (status[0] != CMSISDAP_CMD_DISCONNECT ||
+      status[1] != 0)
+    fprintf(stderr,
+	    "%s: jtag3_edbg_signoff(): unexpected response 0x%02x, 0x%02x\n",
+	    progname, status[0], status[1]);
 
   return 0;
 }
@@ -446,6 +641,9 @@ static int jtag3_recv_frame(PROGRAMMER * pgm, unsigned char **msg) {
   int rv;
   unsigned char *buf = NULL;
 
+  if (pgm->flag & PGM_FL_IS_EDBG)
+    return jtag3_edbg_recv_frame(pgm, msg);
+
   if (verbose >= 4)
     fprintf(stderr, "%s: jtag3_recv():\n", progname);
 
@@ -454,6 +652,8 @@ static int jtag3_recv_frame(PROGRAMMER * pgm, unsigned char **msg) {
 	    progname);
     return -1;
   }
+  if (verbose >= 4)
+    memset(buf, 0, pgm->fd.usb.max_xfer);
 
   rv = serial_recv(&pgm->fd, buf, pgm->fd.usb.max_xfer);
 
@@ -466,6 +666,62 @@ static int jtag3_recv_frame(PROGRAMMER * pgm, unsigned char **msg) {
     free(buf);
     return -1;
   }
+
+  *msg = buf;
+
+  return rv;
+}
+
+static int jtag3_edbg_recv_frame(PROGRAMMER * pgm, unsigned char **msg) {
+  int rv, len;
+  unsigned char *buf = NULL;
+
+  if (verbose >= 4)
+    fprintf(stderr, "%s: jtag3_edbg_recv():\n", progname);
+
+  if ((buf = malloc(USBDEV_MAX_XFER_3)) == NULL) {
+    fprintf(stderr, "%s: jtag3_edbg_recv(): out of memory\n",
+	    progname);
+    return -1;
+  }
+
+  buf[0] = EDBG_VENDOR_AVR_RSP;
+
+  if (serial_send(&pgm->fd, buf, USBDEV_MAX_XFER_3) != 0) {
+    fprintf(stderr,
+	    "%s: jtag3_edbg_recv(): error sending CMSIS-DAP vendor command\n",
+	    progname);
+    return -1;
+  }
+
+  rv = serial_recv(&pgm->fd, buf, USBDEV_MAX_XFER_3);
+
+  if (rv < 0) {
+    /* timeout in receive */
+    if (verbose > 1)
+      fprintf(stderr,
+	      "%s: jtag3_edbg_recv(): Timeout receiving packet\n",
+	      progname);
+    free(buf);
+    return -1;
+  }
+
+  if (buf[0] != EDBG_VENDOR_AVR_RSP ||
+      buf[1] != ((1 << 4) | 1)) {
+    fprintf(stderr,
+	    "%s: jtag3_edbg_recv(): Unexpected response 0x%02x, 0x%02x\n",
+	    progname, buf[0], buf[1]);
+    return -1;
+  }
+  /* calculate length from response; CMSIS-DAP response might be larger */
+  len = (buf[2] << 8) | buf[3];
+  if (len > rv + 4) {
+    fprintf(stderr,
+	    "%s: jtag3_edbg_recv(): Unexpected length value (%d > %d)\n",
+	    progname, len, rv + 4);
+    len = rv + 4;
+  }
+  memmove(buf, buf + 4, len);
 
   *msg = buf;
 
@@ -502,8 +758,8 @@ int jtag3_recv(PROGRAMMER * pgm, unsigned char **msg) {
        * the job easier for the caller.  We have to return the
        * original pointer though, as the caller must free() it.
        */
-      memmove(*msg, *msg + 3, rv);
       rv -= 3;
+      memmove(*msg, *msg + 3, rv);
 
       return rv;
     }
@@ -561,6 +817,11 @@ int jtag3_getsync(PROGRAMMER * pgm, int mode) {
 
   if (verbose >= 3)
     fprintf(stderr, "%s: jtag3_getsync()\n", progname);
+
+  if (pgm->flag & PGM_FL_IS_EDBG) {
+    if (jtag3_edbg_prepare(pgm) < 0)
+      return -1;
+  }
 
   /* Get the sign-on information. */
   buf[0] = SCOPE_GENERAL;
@@ -705,7 +966,7 @@ static int jtag3_initialize(PROGRAMMER * pgm, AVRPART * p)
    */
   if (jtag3_getparm(pgm, SCOPE_GENERAL, 0, PARM3_FW_MAJOR, parm, 2) < 0)
     return -1;
-  if (pgm->fd.usb.max_xfer < USBDEV_MAX_XFER_3) {
+  if (pgm->fd.usb.max_xfer < USBDEV_MAX_XFER_3 && (pgm->flag & PGM_FL_IS_EDBG) == 0) {
     fprintf(stderr,
 	    "%s: the JTAGICE3's firmware %d.%d is broken on USB 1.1 connections, sorry\n",
 	    progname, parm[0], parm[1]);
@@ -714,7 +975,6 @@ static int jtag3_initialize(PROGRAMMER * pgm, AVRPART * p)
 	      "%s: forced to continue by option -F; THIS PUTS THE DEVICE'S DATA INTEGRITY AT RISK!\n",
 	      progname);
     } else {
-      serial_close(&pgm->fd);
       return -1;
     }
   }
@@ -1018,42 +1278,89 @@ static int jtag3_parseextparms(PROGRAMMER * pgm, LISTID extparms)
   return rv;
 }
 
-
-static int jtag3_open(PROGRAMMER * pgm, char * port)
+int jtag3_open_common(PROGRAMMER * pgm, char * port)
 {
-  long baud;
+  union pinfo pinfo;
+  LNODEID usbpid;
+  int rv = -1;
 
-  if (verbose >= 2)
-    fprintf(stderr, "%s: jtag3_open()\n", progname);
+#if !defined(HAVE_LIBUSB)
+  fprintf(stderr, "avrdude was compiled without usb support.\n");
+  return -1;
+#endif
 
-  /*
-   * The serial_open() function for USB overrides
-   * the meaning of the "baud" parameter to be the USB device ID to
-   * search for.
-   */
-  if (strncmp(port, "usb", 3) == 0) {
-#if defined(HAVE_LIBUSB)
-    serdev = &usb_serdev_frame;
-    baud = USB_DEVICE_JTAGICE3;
+  if (strncmp(port, "usb", 3) != 0) {
+    fprintf(stderr,
+            "%s: jtag3_open_common(): JTAGICE3/EDBG port names must start with \"usb\"\n",
+            progname);
+    return -1;
+  }
+
+  serdev = &usb_serdev_frame;
+  if (pgm->usbvid)
+    pinfo.usbinfo.vid = pgm->usbvid;
+  else
+    pinfo.usbinfo.vid = USB_VENDOR_ATMEL;
+
+  /* If the config entry did not specify a USB PID, insert the default one. */
+  if (lfirst(pgm->usbpid) == NULL)
+    ladd(pgm->usbpid, (void *)USB_DEVICE_JTAGICE3);
+
+  for (usbpid = lfirst(pgm->usbpid); rv < 0 && usbpid != NULL; usbpid = lnext(usbpid)) {
+    pinfo.usbinfo.flags = PINFO_FL_SILENT;
+    pinfo.usbinfo.pid = *(int *)(ldata(usbpid));
     pgm->fd.usb.max_xfer = USBDEV_MAX_XFER_3;
     pgm->fd.usb.rep = USBDEV_BULK_EP_READ_3;
     pgm->fd.usb.wep = USBDEV_BULK_EP_WRITE_3;
     pgm->fd.usb.eep = USBDEV_EVT_EP_READ_3;
-#else
-    fprintf(stderr, "avrdude was compiled without usb support.\n");
+
+    strcpy(pgm->port, port);
+    rv = serial_open(port, pinfo, &pgm->fd);
+  }
+  if (rv < 0) {
+    fprintf(stderr,
+            "%s: jtag3_open_common(): Did not find any device matching VID 0x%04x and PID list: ",
+            progname, (unsigned)pinfo.usbinfo.vid);
+    int notfirst = 0;
+    for (usbpid = lfirst(pgm->usbpid); usbpid != NULL; usbpid = lnext(usbpid)) {
+      if (notfirst)
+        fprintf(stderr, ", ");
+      fprintf(stderr, "0x%04x", (unsigned int)(*(int *)(ldata(usbpid))));
+      notfirst = 1;
+    }
+    fputc('\n', stderr);
+
     return -1;
-#endif
   }
 
-  strcpy(pgm->port, port);
-  if (serial_open(port, baud, &pgm->fd)==-1) {
-    return -1;
+  if (pgm->fd.usb.eep == 0)
+  {
+    /* The event EP has been deleted by usb_open(), so we are
+       running on a CMSIS-DAP device, using EDBG protocol */
+    pgm->flag |= PGM_FL_IS_EDBG;
+    if (verbose)
+      fprintf(stderr,
+              "%s: Found CMSIS-DAP compliant device, using EDBG protocol\n",
+              progname);
   }
 
   /*
    * drain any extraneous input
    */
   jtag3_drain(pgm, 0);
+
+  return 0;
+}
+
+
+
+static int jtag3_open(PROGRAMMER * pgm, char * port)
+{
+  if (verbose >= 2)
+    fprintf(stderr, "%s: jtag3_open()\n", progname);
+
+  if (jtag3_open_common(pgm, port) < 0)
+    return -1;
 
   if (jtag3_getsync(pgm, PARM3_CONN_JTAG) < 0)
     return -1;
@@ -1063,39 +1370,11 @@ static int jtag3_open(PROGRAMMER * pgm, char * port)
 
 static int jtag3_open_dw(PROGRAMMER * pgm, char * port)
 {
-  long baud;
-
   if (verbose >= 2)
     fprintf(stderr, "%s: jtag3_open_dw()\n", progname);
 
-  /*
-   * The serial_open() function for USB overrides
-   * the meaning of the "baud" parameter to be the USB device ID to
-   * search for.
-   */
-  if (strncmp(port, "usb", 3) == 0) {
-#if defined(HAVE_LIBUSB)
-    serdev = &usb_serdev_frame;
-    baud = USB_DEVICE_JTAGICE3;
-    pgm->fd.usb.max_xfer = USBDEV_MAX_XFER_3;
-    pgm->fd.usb.rep = USBDEV_BULK_EP_READ_3;
-    pgm->fd.usb.wep = USBDEV_BULK_EP_WRITE_3;
-    pgm->fd.usb.eep = USBDEV_EVT_EP_READ_3;
-#else
-    fprintf(stderr, "avrdude was compiled without usb support.\n");
+  if (jtag3_open_common(pgm, port) < 0)
     return -1;
-#endif
-  }
-
-  strcpy(pgm->port, port);
-  if (serial_open(port, baud, &pgm->fd)==-1) {
-    return -1;
-  }
-
-  /*
-   * drain any extraneous input
-   */
-  jtag3_drain(pgm, 0);
 
   if (jtag3_getsync(pgm, PARM3_CONN_DW) < 0)
     return -1;
@@ -1105,39 +1384,11 @@ static int jtag3_open_dw(PROGRAMMER * pgm, char * port)
 
 static int jtag3_open_pdi(PROGRAMMER * pgm, char * port)
 {
-  long baud;
-
   if (verbose >= 2)
     fprintf(stderr, "%s: jtag3_open_pdi()\n", progname);
 
-  /*
-   * The serial_open() function for USB overrides
-   * the meaning of the "baud" parameter to be the USB device ID to
-   * search for.
-   */
-  if (strncmp(port, "usb", 3) == 0) {
-#if defined(HAVE_LIBUSB)
-    serdev = &usb_serdev_frame;
-    baud = USB_DEVICE_JTAGICE3;
-    pgm->fd.usb.max_xfer = USBDEV_MAX_XFER_3;
-    pgm->fd.usb.rep = USBDEV_BULK_EP_READ_3;
-    pgm->fd.usb.wep = USBDEV_BULK_EP_WRITE_3;
-    pgm->fd.usb.eep = USBDEV_EVT_EP_READ_3;
-#else
-    fprintf(stderr, "avrdude was compiled without usb support.\n");
+  if (jtag3_open_common(pgm, port) < 0)
     return -1;
-#endif
-  }
-
-  strcpy(pgm->port, port);
-  if (serial_open(port, baud, &pgm->fd)==-1) {
-    return -1;
-  }
-
-  /*
-   * drain any extraneous input
-   */
-  jtag3_drain(pgm, 0);
 
   if (jtag3_getsync(pgm, PARM3_CONN_PDI) < 0)
     return -1;
@@ -1165,6 +1416,9 @@ void jtag3_close(PROGRAMMER * pgm)
 
   if (jtag3_command(pgm, buf, 4, &resp, "sign-off") >= 0)
     free(resp);
+
+  if (pgm->flag & PGM_FL_IS_EDBG)
+    jtag3_edbg_signoff(pgm);
 
   serial_close(&pgm->fd);
   pgm->fd.ifd = -1;

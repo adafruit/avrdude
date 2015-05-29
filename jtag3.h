@@ -16,7 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: jtag3.h 1123 2012-12-03 21:03:06Z joerg_wunsch $ */
+/* $Id: jtag3.h 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 #ifndef jtag3_h
 #define jtag3_h
@@ -25,6 +25,7 @@
 extern "C" {
 #endif
 
+int  jtag3_open_common(PROGRAMMER * pgm, char * port);
 int  jtag3_send(PROGRAMMER * pgm, unsigned char * data, size_t len);
 int  jtag3_recv(PROGRAMMER * pgm, unsigned char **msg);
 void jtag3_close(PROGRAMMER * pgm);

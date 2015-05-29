@@ -14,11 +14,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: update.h 1007 2011-09-14 21:49:42Z joerg_wunsch $ */
+/* $Id: update.h 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 #ifndef update_h
 #define update_h
@@ -27,6 +26,12 @@ enum {
   DEVICE_READ,
   DEVICE_WRITE,
   DEVICE_VERIFY
+};
+
+enum updateflags {
+  UF_NONE = 0,
+  UF_NOWRITE = 1,
+  UF_AUTO_ERASE = 2,
 };
 
 
@@ -45,8 +50,9 @@ extern UPDATE * parse_op(char * s);
 extern UPDATE * dup_update(UPDATE * upd);
 extern UPDATE * new_update(int op, char * memtype, int filefmt,
 			   char * filename);
+extern void free_update(UPDATE * upd);
 extern int do_op(PROGRAMMER * pgm, struct avrpart * p, UPDATE * upd,
-		 int nowrite);
+		 enum updateflags flags);
 
 #ifdef __cplusplus
 }

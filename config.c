@@ -13,11 +13,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: config.c 988 2011-08-26 20:30:26Z joerg_wunsch $ */
+/* $Id: config.c 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 #include "ac_cfg.h"
 
@@ -36,6 +35,7 @@ char default_programmer[MAX_STR_CONST];
 char default_parallel[PATH_MAX];
 char default_serial[PATH_MAX];
 double default_bitclock;
+int default_safemode;
 
 char string_buf[MAX_STR_CONST];
 char *string_buf_ptr;
@@ -55,6 +55,13 @@ extern char * yytext;
 
 #define DEBUG 0
 
+void cleanup_config(void)
+{
+  ldestroy_cb(part_list, (void(*)(void*))avr_free_part);
+  ldestroy_cb(programmers, (void(*)(void*))pgm_free);
+  ldestroy_cb(string_list, (void(*)(void*))free_token);
+  ldestroy_cb(number_list, (void(*)(void*))free_token);
+}
 
 int init_config(void)
 {
@@ -62,7 +69,7 @@ int init_config(void)
   number_list  = lcreat(NULL, 0);
   current_prog = NULL;
   current_part = NULL;
-  current_mem  = 0;
+  current_mem  = NULL;
   part_list    = lcreat(NULL, 0);
   programmers  = lcreat(NULL, 0);
 
@@ -82,7 +89,7 @@ int yywrap()
 
 int yyerror(char * errmsg)
 {
-  fprintf(stderr, "%s at %s:%d\n", errmsg, infile, lineno);
+  fprintf(stderr, "%s: %s at %s:%d\n", progname, errmsg, infile, lineno);
   exit(1);
 }
 
@@ -108,15 +115,14 @@ TOKEN * new_token(int primary)
 void free_token(TOKEN * tkn)
 {
   if (tkn) {
-    switch (tkn->primary) {
-      case TKN_STRING:
-      case TKN_ID:
+    switch (tkn->value.type) {
+      case V_STR:
         if (tkn->value.string)
           free(tkn->value.string);
         tkn->value.string = NULL;
         break;
     }
-    
+
     free(tkn);
   }
 }
@@ -143,15 +149,29 @@ TOKEN * number(char * text)
 
   tkn = new_token(TKN_NUMBER);
   tkn->value.type   = V_NUM;
-  tkn->value.number = atof(text);
+  tkn->value.number = atoi(text);
 
 #if DEBUG
-  fprintf(stderr, "NUMBER(%g)\n", tkn->value.number);
+  fprintf(stderr, "NUMBER(%d)\n", tkn->value.number);
 #endif
 
   return tkn;
 }
 
+TOKEN * number_real(char * text)
+{
+  struct token_t * tkn;
+
+  tkn = new_token(TKN_NUMBER);
+  tkn->value.type   = V_NUM_REAL;
+  tkn->value.number_real = atof(text);
+
+#if DEBUG
+  fprintf(stderr, "NUMBER(%g)\n", tkn->value.number_real);
+#endif
+
+  return tkn;
+}
 
 TOKEN * hexnumber(char * text)
 {
@@ -200,31 +220,6 @@ TOKEN * string(char * text)
 }
 
 
-TOKEN * id(char * text)
-{
-  struct token_t * tkn;
-  int len;
-
-  tkn = new_token(TKN_ID);
-
-  len = strlen(text);
-
-  tkn->value.type   = V_STR;
-  tkn->value.string = (char *) malloc(len+1);
-  if (tkn->value.string == NULL) {
-    fprintf(stderr, "id(): out of memory\n");
-    exit(1);
-  }
-  strcpy(tkn->value.string, text);
-
-#if DEBUG
-  fprintf(stderr, "ID(%s)\n", tkn->value.string);
-#endif
-
-  return tkn;
-}
-
-
 TOKEN * keyword(int primary)
 {
   struct token_t * tkn;
@@ -241,21 +236,21 @@ void print_token(TOKEN * tkn)
     return;
 
   fprintf(stderr, "token = %d = ", tkn->primary);
-  switch (tkn->primary) {
-    case TKN_NUMBER: 
-      fprintf(stderr, "NUMBER, value=%g", tkn->value.number); 
+  switch (tkn->value.type) {
+    case V_NUM:
+      fprintf(stderr, "NUMBER, value=%d", tkn->value.number);
       break;
 
-    case TKN_STRING: 
-      fprintf(stderr, "STRING, value=%s", tkn->value.string); 
+    case V_NUM_REAL:
+      fprintf(stderr, "NUMBER, value=%g", tkn->value.number_real);
       break;
 
-    case TKN_ID:  
-      fprintf(stderr, "ID,     value=%s", tkn->value.string); 
+    case V_STR:
+      fprintf(stderr, "STRING, value=%s", tkn->value.string);
       break;
 
-    default:     
-      fprintf(stderr, "<other>"); 
+    default:
+      fprintf(stderr, "<other>");
       break;
   }
 
@@ -284,6 +279,11 @@ char * dup_string(const char * str)
   return s;
 }
 
+#ifdef HAVE_YYLEX_DESTROY
+/* reset lexer and free any allocated memory */
+extern int yylex_destroy(void);
+#endif
+
 int read_config(const char * file)
 {
   FILE * f;
@@ -300,6 +300,11 @@ int read_config(const char * file)
   yyin   = f;
 
   yyparse();
+
+#ifdef HAVE_YYLEX_DESTROY
+  /* reset lexer and free any allocated memory */
+  yylex_destroy();
+#endif
 
   fclose(f);
 

@@ -145,9 +145,10 @@ static int linuxgpio_dir_in(unsigned int gpio)
 static int linuxgpio_fds[N_GPIO] ;
 
 
-static int linuxgpio_setpin(PROGRAMMER * pgm, int pin, int value)
+static int linuxgpio_setpin(PROGRAMMER * pgm, int pinfunc, int value)
 {
   int r;
+  int pin = pgm->pinno[pinfunc]; // TODO
 
   if (pin & PIN_INVERSE)
   {
@@ -171,10 +172,11 @@ static int linuxgpio_setpin(PROGRAMMER * pgm, int pin, int value)
   return 0;
 }
 
-static int linuxgpio_getpin(PROGRAMMER * pgm, int pin)
+static int linuxgpio_getpin(PROGRAMMER * pgm, int pinfunc)
 {
   unsigned char invert=0;
   char c;
+  int pin = pgm->pinno[pinfunc]; // TODO
 
   if (pin & PIN_INVERSE)
   {
@@ -200,14 +202,15 @@ static int linuxgpio_getpin(PROGRAMMER * pgm, int pin)
 
 }
 
-static int linuxgpio_highpulsepin(PROGRAMMER * pgm, int pin)
+static int linuxgpio_highpulsepin(PROGRAMMER * pgm, int pinfunc)
 {
-
+  int pin = pgm->pinno[pinfunc]; // TODO
+  
   if ( linuxgpio_fds[pin & PIN_MASK] < 0 )
     return -1;
 
-  linuxgpio_setpin(pgm, pin, 1);
-  linuxgpio_setpin(pgm, pin, 0);
+  linuxgpio_setpin(pgm, pinfunc, 1);
+  linuxgpio_setpin(pgm, pinfunc, 0);
 
   return 0;
 }
@@ -258,7 +261,7 @@ static int linuxgpio_open(PROGRAMMER *pgm, char *port)
   //mostry LED status, can't be set to GPIO0. It can be fixed when a better 
   //solution exists.
   for (i=0; i<N_PINS; i++) {
-    if ( pgm->pinno[i] != 0 ||
+    if ( (pgm->pinno[i] & PIN_MASK) != 0 ||
          i == PIN_AVR_RESET ||
          i == PIN_AVR_SCK   ||
          i == PIN_AVR_MOSI  ||

@@ -13,11 +13,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: serial.h 948 2010-10-22 14:29:56Z springob $ */
+/* $Id: serial.h 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 /* This is the API for the generic serial interface. The implementations are
    actually provided by the target dependant files:
@@ -38,14 +37,32 @@ union filedescriptor
   struct
   {
     void *handle;
-    int ep;
+    int rep;                    /* bulk read endpoint */
+    int wep;                    /* bulk write endpoint */
+    int eep;                    /* event read endpoint */
+    int max_xfer;               /* max transfer size */
+    int use_interrupt_xfer;     /* device uses interrupt transfers */
   } usb;
 };
+
+union pinfo
+{
+  long baud;
+  struct
+  {
+    unsigned short vid;
+    unsigned short pid;
+    unsigned short flags;
+#define PINFO_FL_USEHID         0x0001
+#define PINFO_FL_SILENT         0x0002  /* don't complain if not found */
+  } usbinfo;
+};
+
 
 struct serial_device
 {
   // open should return -1 on error, other values on success
-  int (*open)(char * port, long baud, union filedescriptor *fd); 
+  int (*open)(char * port, union pinfo pinfo, union filedescriptor *fd); 
   int (*setspeed)(union filedescriptor *fd, long baud);
   void (*close)(union filedescriptor *fd);
 

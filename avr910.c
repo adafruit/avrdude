@@ -15,11 +15,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: avr910.c 1007 2011-09-14 21:49:42Z joerg_wunsch $ */
+/* $Id: avr910.c 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 /*
  * avrdude interface for Atmel Low Cost Serial programmers which adher to the
@@ -165,8 +164,7 @@ static int avr910_initialize(PROGRAMMER * pgm, AVRPART * p)
   char hw[2];
   char buf[10];
   char type;
-  char c, devtype_1st;
-  int dev_supported = 0;
+  char c;
   AVRPART * part;
 
   /* Get the programmer identifier. Programmer returns exactly 7 chars
@@ -223,6 +221,8 @@ static int avr910_initialize(PROGRAMMER * pgm, AVRPART * p)
   }
 
   if (PDATA(pgm)->devcode == 0) {
+    char devtype_1st;
+    int dev_supported = 0;
 
     /* Get list of devices that the programmer supports. */
 
@@ -299,8 +299,8 @@ static void avr910_enable(PROGRAMMER * pgm)
  * transmit an AVR device command and return the results; 'cmd' and
  * 'res' must point to at least a 4 byte data buffer
  */
-static int avr910_cmd(PROGRAMMER * pgm, unsigned char cmd[4], 
-                      unsigned char res[4])
+static int avr910_cmd(PROGRAMMER * pgm, const unsigned char *cmd,
+                      unsigned char *res)
 {
   char buf[5];
 
@@ -375,6 +375,7 @@ static int avr910_parseextparms(PROGRAMMER * pgm, LISTID extparms)
 
 static int avr910_open(PROGRAMMER * pgm, char * port)
 {
+  union pinfo pinfo;
   /*
    *  If baudrate was not specified use 19.200 Baud
    */
@@ -383,7 +384,8 @@ static int avr910_open(PROGRAMMER * pgm, char * port)
   }
 
   strcpy(pgm->port, port);
-  if (serial_open(port, pgm->baudrate, &pgm->fd)==-1) {
+  pinfo.baud = pgm->baudrate;
+  if (serial_open(port, pinfo, &pgm->fd)==-1) {
     return -1;
   }
 
@@ -612,16 +614,23 @@ static int avr910_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
     unsigned int max_addr = addr + n_bytes;
     char *cmd;
     unsigned int blocksize = PDATA(pgm)->buffersize;
+    int wr_size;
 
     if (strcmp(m->desc, "flash") && strcmp(m->desc, "eeprom"))
-      rval = -2;
+      return -2;
 
-    if (m->desc[0] == 'e')
+    if (m->desc[0] == 'e') {
       blocksize = 1;		/* Write to eeprom single bytes only */
-    avr910_set_addr(pgm, addr);
+      wr_size = 1;
+    } else {
+      wr_size = 2;
+    }
+
+    avr910_set_addr(pgm, addr / wr_size);
 
     cmd = malloc(4 + blocksize);
-    if (!cmd) rval = -1;
+    if (!cmd) return -1;
+     
     cmd[0] = 'B';
     cmd[3] = toupper((int)(m->desc[0]));
 
@@ -742,6 +751,7 @@ static int avr910_read_sig_bytes(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m)
   return 3;
 }
 
+const char avr910_desc[] = "Serial programmers using protocol described in application note AVR910";
 
 void avr910_initpgm(PROGRAMMER * pgm)
 {

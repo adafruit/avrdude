@@ -1,6 +1,77 @@
+avrdude 6.1 optimized for Raspberry Pi fork
+===========================================
+
+This is a fork of avrdude 6.1 which adds memory-mapped GPIO support for fast
+bitbanging on the Raspberry Pi & Pi 2.
+
+To build and install on the Pi make sure you have necessary dependencies by
+running the following commands (on Raspbian):
+
+  sudo apt-get update
+  sudo apt-get install -y build-essential bison flex libelf-dev libusb-1.0-0-dev \
+  libusb-dev libftdi-dev libftdi1
+
+Then run a typical ./configure, make and make install with:
+
+  ./configure
+  make
+  sudo make install
+
+Once installed edit the /usr/local/etc/avrdude.conf file (or copy it to create
+a new one) and uncomment the section that defines a programmer of type "pigpio".
+
+When running avrdude with the pigpio programmer type you will most likely need
+to specify a small interbit delay with the -i option (or else you will get
+random failures to verify and read data).  A value of -i 2 appears to be low
+enough to provide reliable reads & writes.
+
+Also be sure to run avrdude as root when using the pigpio programmer type.
+
+--------------------------------------------------------------------------------
+
 See the documentation file for the details.
 
 The latest version of AVRDUDE is always available here:
 
   http://savannah.nongnu.org/projects/avrdude
 
+
+Important environment variables for ./configure:
+================================================
+
+CPPFLAGS: C preprocessor flags (*not* "C++")
+
+This is the place to put additional (non-standard) -I options into.
+For example, if your Windows system has LibUSB-Win32 installed into
+\\WINDOWS\ProgramFiles\LibUSB-Win32, use
+
+CPPFLAGS=-I/WINDOWS/ProgramFiles/LibUSB-Win32/include
+
+to tell configure where to search for the header files.  (The use of
+forward slashes rather than backslashes can often simplify things.
+Note that the Windows system services internally treat both the same.
+It's only cmd.exe which requires backslashes as the directory
+separator.)
+
+LDFLAGS: Linker options
+
+This is the place to make additional library locations known to the
+linker.  To continue the above example, use
+
+LDFLAGS=-L/WINDOWS/ProgramFiles/LibUSB-Win32/lib/gcc
+
+to make the linker search for "libusb.a" in that directory.
+
+
+Linux users: make sure the header files are installed
+=====================================================
+
+While many Linux distributions install the libraries needed by AVRDUDE
+(libusb, libelf) by default, they leave out the corresponding header
+files.  Consequently, the configure script won't find them, so these
+libraries could not be used.
+
+Usually, the packages with the header files (and static libraries) are
+derived from the regular package name by appending "-devel".  Thus,
+make sure you have "libusb-devel" and "libelf-devel" installed before
+running the configure script.  (Same goes for libftdi.)

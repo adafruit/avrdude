@@ -14,11 +14,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: config_gram.y 1002 2011-08-29 09:25:04Z joerg_wunsch $ */
+/* $Id: config_gram.y 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 %{
 
 #include "ac_cfg.h"
@@ -36,20 +35,8 @@
 #include "pindefs.h"
 #include "ppi.h"
 #include "pgm.h"
-#include "stk500.h"
-#include "arduino.h"
-#include "buspirate.h"
-#include "stk500v2.h"
-#include "wiring.h"
-#include "stk500generic.h"
-#include "avr910.h"
-#include "butterfly.h"
-#include "usbasp.h"
-#include "usbtiny.h"
+#include "pgm_type.h"
 #include "avr.h"
-#include "jtagmkI.h"
-#include "jtagmkII.h"
-#include "avrftdi.h"
 
 #if defined(WIN32NATIVE)
 #define strtok_r( _s, _sep, _lasts ) \
@@ -60,9 +47,11 @@ int yylex(void);
 int yyerror(char * errmsg);
 
 static int assign_pin(int pinno, TOKEN * v, int invert);
+static int assign_pin_list(int invert);
 static int which_opcode(TOKEN * opcode);
 static int parse_cmdbits(OPCODE * op);
- 
+
+static int pin_name;
 %}
 
 %token K_READ
@@ -83,26 +72,19 @@ static int parse_cmdbits(OPCODE * op);
 %token K_PAGE_SIZE
 %token K_PAGED
 
-%token K_ARDUINO
-%token K_AVRFTDI
 %token K_BAUDRATE
 %token K_BS2
 %token K_BUFF
-%token K_BUSPIRATE
 %token K_CHIP_ERASE_DELAY
+%token K_CONNTYPE
 %token K_DEDICATED
+%token K_DEFAULT_BITCLOCK
 %token K_DEFAULT_PARALLEL
 %token K_DEFAULT_PROGRAMMER
+%token K_DEFAULT_SAFEMODE
 %token K_DEFAULT_SERIAL
-%token K_DEFAULT_BITCLOCK
 %token K_DESC
 %token K_DEVICECODE
-%token K_DRAGON_DW
-%token K_DRAGON_HVSP
-%token K_DRAGON_ISP
-%token K_DRAGON_JTAG
-%token K_DRAGON_PDI
-%token K_DRAGON_PP
 %token K_STK500_DEVCODE
 %token K_AVR910_DEVCODE
 %token K_EEPROM
@@ -110,23 +92,19 @@ static int parse_cmdbits(OPCODE * op);
 %token K_FLASH
 %token K_ID
 %token K_IO
-%token K_JTAG_MKI
-%token K_JTAG_MKII
-%token K_JTAG_MKII_AVR32
-%token K_JTAG_MKII_DW
-%token K_JTAG_MKII_ISP
-%token K_JTAG_MKII_PDI
 %token K_LOADPAGE
 %token K_MAX_WRITE_DELAY
+%token K_MCU_BASE
 %token K_MIN_WRITE_DELAY
 %token K_MISO
 %token K_MOSI
 %token K_NUM_PAGES
 %token K_NVM_BASE
+%token K_OCDREV
 %token K_OFFSET
 %token K_PAGEL
-%token K_PAR
 %token K_PARALLEL
+%token K_PARENT
 %token K_PART
 %token K_PGMLED
 %token K_PROGRAMMER
@@ -138,34 +116,20 @@ static int parse_cmdbits(OPCODE * op);
 %token K_READMEM
 %token K_RESET
 %token K_RETRY_PULSE
-%token K_SERBB
 %token K_SERIAL
 %token K_SCK
 %token K_SIGNATURE
 %token K_SIZE
-%token K_STK500
-%token K_STK500HVSP
-%token K_STK500PP
-%token K_STK500V2
-%token K_STK500GENERIC
-%token K_STK600
-%token K_STK600HVSP
-%token K_STK600PP
-%token K_AVR910
-%token K_USBASP
+%token K_USB
 %token K_USBDEV
 %token K_USBSN
-%token K_USBTINY
 %token K_USBPID
 %token K_USBPRODUCT
 %token K_USBVENDOR
 %token K_USBVID
-%token K_BUTTERFLY
-%token K_BUTTERFLY_MK
 %token K_TYPE
 %token K_VCC
 %token K_VFYLED
-%token K_WIRING
 
 %token K_NO
 %token K_YES
@@ -237,13 +201,26 @@ static int parse_cmdbits(OPCODE * op);
 %token TKN_EQUAL
 %token TKN_SEMI
 %token TKN_TILDE
+%token TKN_LEFT_PAREN
+%token TKN_RIGHT_PAREN
 %token TKN_NUMBER
+%token TKN_NUMBER_REAL
 %token TKN_STRING
-%token TKN_ID
 
 %start configuration
 
 %%
+
+number_real : 
+ TKN_NUMBER {
+    $$ = $1;
+    /* convert value to real */
+    $$->value.number_real = $$->value.number;
+    $$->value.type = V_NUM_REAL;
+  } |
+  TKN_NUMBER_REAL {
+    $$ = $1;
+  }
 
 configuration :
   /* empty */ | config
@@ -278,49 +255,85 @@ def :
     free_token($3);
   } |
 
-  K_DEFAULT_BITCLOCK TKN_EQUAL TKN_NUMBER TKN_SEMI {
-    default_bitclock = $3->value.number;
+  K_DEFAULT_BITCLOCK TKN_EQUAL number_real TKN_SEMI {
+    default_bitclock = $3->value.number_real;
+    free_token($3);
+  } |
+
+  K_DEFAULT_SAFEMODE TKN_EQUAL yesno TKN_SEMI {
+    if ($3->primary == K_YES)
+      default_safemode = 1;
+    else if ($3->primary == K_NO)
+      default_safemode = 0;
     free_token($3);
   }
 ;
 
 
 prog_def :
-  K_PROGRAMMER 
-    { current_prog = pgm_new();
-      strcpy(current_prog->config_file, infile);
-      current_prog->lineno = lineno;
-    }
-    prog_parms
-    { 
+  prog_decl prog_parms
+    {
+      PROGRAMMER * existing_prog;
+      char * id;
       if (lsize(current_prog->id) == 0) {
         fprintf(stderr,
                 "%s: error at %s:%d: required parameter id not specified\n",
                 progname, infile, lineno);
         exit(1);
       }
-      if (current_prog->type[0] == 0) {
+      if (current_prog->initpgm == NULL) {
         fprintf(stderr, "%s: error at %s:%d: programmer type not specified\n",
                 progname, infile, lineno);
         exit(1);
       }
-      PUSH(programmers, current_prog); 
-      current_prog = NULL; 
+      id = ldata(lfirst(current_prog->id));
+      existing_prog = locate_programmer(programmers, id);
+      if (existing_prog) {
+        fprintf(stderr, "%s: warning at %s:%d: programmer %s overwrites "
+                "previous definition %s:%d.\n",
+                progname, infile, current_prog->lineno,
+                id, existing_prog->config_file, existing_prog->lineno);
+        lrmv_d(programmers, existing_prog);
+        pgm_free(existing_prog);
+      }
+      PUSH(programmers, current_prog);
+//      pgm_fill_old_pins(current_prog); // TODO to be removed if old pin data no longer needed
+//      pgm_display_generic(current_prog, id);
+      current_prog = NULL;
+    }
+;
+
+
+prog_decl :
+  K_PROGRAMMER
+    { current_prog = pgm_new();
+      strcpy(current_prog->config_file, infile);
+      current_prog->lineno = lineno;
+    }
+    |
+  K_PROGRAMMER K_PARENT TKN_STRING
+    {
+      struct programmer_t * pgm = locate_programmer(programmers, $3->value.string);
+      if (pgm == NULL) {
+        fprintf(stderr,
+                "%s: error at %s:%d: parent programmer %s not found\n",
+                progname, infile, lineno, $3->value.string);
+        exit(1);
+      }
+      current_prog = pgm_dup(pgm);
+      strcpy(current_prog->config_file, infile);
+      current_prog->lineno = lineno;
+      free_token($3);
     }
 ;
 
 
 part_def :
-  K_PART
-    {
-      current_part = avr_new_part();
-      strcpy(current_part->config_file, infile);
-      current_part->lineno = lineno;
-    }
-    part_parms 
+  part_decl part_parms 
     { 
       LNODEID ln;
       AVRMEM * m;
+      AVRPART * existing_part;
 
       if (current_part->id[0] == 0) {
         fprintf(stderr,
@@ -366,11 +379,44 @@ part_def :
         }
       }
 
+      existing_part = locate_part(part_list, current_part->id);
+      if (existing_part) {
+        fprintf(stderr, "%s: warning at %s:%d: part %s overwrites "
+                "previous definition %s:%d.\n",
+                progname, infile, current_part->lineno, current_part->id,
+                existing_part->config_file, existing_part->lineno);
+        lrmv_d(part_list, existing_part);
+        avr_free_part(existing_part);
+      }
       PUSH(part_list, current_part); 
       current_part = NULL; 
     }
 ;
 
+part_decl :
+  K_PART
+    {
+      current_part = avr_new_part();
+      strcpy(current_part->config_file, infile);
+      current_part->lineno = lineno;
+    } |
+  K_PART K_PARENT TKN_STRING 
+    {
+      AVRPART * parent_part = locate_part(part_list, $3->value.string);
+      if (parent_part == NULL) {
+        fprintf(stderr, 
+              "%s: error at %s:%d: can't find parent part",
+              progname, infile, lineno);
+        exit(1);
+      }
+
+      current_part = avr_dup_part(parent_part);
+      strcpy(current_part->config_file, infile);
+      current_part->lineno = lineno;
+
+      free_token($3);
+    }
+;
 
 string_list :
   TKN_STRING { ladd(string_list, $1); } |
@@ -383,16 +429,14 @@ num_list :
   num_list TKN_COMMA TKN_NUMBER { ladd(number_list, $3); }
 ;
 
-
 prog_parms :
   prog_parm TKN_SEMI |
   prog_parms prog_parm TKN_SEMI
 ;
 
-
 prog_parm :
   K_ID TKN_EQUAL string_list {
-    { 
+    {
       TOKEN * t;
       while (lsize(string_list)) {
         t = lrmv_n(string_list, 1);
@@ -401,231 +445,63 @@ prog_parm :
       }
     }
   } |
-
-  K_TYPE TKN_EQUAL K_PAR {
-    { 
-      par_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_SERBB {
-    {
-      serbb_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_STK500 {
-    { 
-      stk500_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_STK500V2 {
-    {
-      stk500v2_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_WIRING {
-    {
-      wiring_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_STK500HVSP {
-    {
-      stk500hvsp_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_STK500PP {
-    {
-      stk500pp_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_STK500GENERIC {
-    {
-      stk500generic_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_ARDUINO {
-    { 
-      arduino_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_AVRFTDI {
-    {
-      avrftdi_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_BUSPIRATE {
-    {
-      buspirate_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_STK600 {
-    {
-      stk600_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_STK600HVSP {
-    {
-      stk600hvsp_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_STK600PP {
-    {
-      stk600pp_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_AVR910 {
-    { 
-      avr910_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_USBASP {
-    {
-      usbasp_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_USBTINY {
-    {
-      usbtiny_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_BUTTERFLY {
-    { 
-      butterfly_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_BUTTERFLY_MK {
-    { 
-      butterfly_mk_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_JTAG_MKI {
-    {
-      jtagmkI_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_JTAG_MKII {
-    {
-      jtagmkII_initpgm(current_prog);
-    }
-  } |
-  K_TYPE TKN_EQUAL K_JTAG_MKII_AVR32 {
-    {
-      jtagmkII_avr32_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_JTAG_MKII_DW {
-    {
-      jtagmkII_dw_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_JTAG_MKII_ISP {
-    {
-      stk500v2_jtagmkII_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_JTAG_MKII_PDI {
-    {
-      jtagmkII_pdi_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_DRAGON_DW {
-    {
-      jtagmkII_dragon_dw_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_DRAGON_HVSP {
-    {
-      stk500v2_dragon_hvsp_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_DRAGON_ISP {
-    {
-      stk500v2_dragon_isp_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_DRAGON_JTAG {
-    {
-      jtagmkII_dragon_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_DRAGON_PDI {
-    {
-      jtagmkII_dragon_pdi_initpgm(current_prog);
-    }
-  } |
-
-  K_TYPE TKN_EQUAL K_DRAGON_PP {
-    {
-      stk500v2_dragon_pp_initpgm(current_prog);
-    }
-  } |
-
+  prog_parm_type
+  |
+  prog_parm_pins
+  |
+  prog_parm_usb
+  |
+  prog_parm_conntype
+  |
   K_DESC TKN_EQUAL TKN_STRING {
     strncpy(current_prog->desc, $3->value.string, PGM_DESCLEN);
     current_prog->desc[PGM_DESCLEN-1] = 0;
     free_token($3);
   } |
-
-  K_VCC TKN_EQUAL num_list {
-    { 
-      TOKEN * t;
-      int pin;
-
-      current_prog->pinno[PPI_AVR_VCC] = 0;
-
-      while (lsize(number_list)) {
-        t = lrmv_n(number_list, 1);
-        pin = t->value.number;
-        current_prog->pinno[PPI_AVR_VCC] |= (1 << pin);
-
-        free_token(t);
-      }
+  K_BAUDRATE TKN_EQUAL TKN_NUMBER {
+    {
+      current_prog->baudrate = $3->value.number;
+      free_token($3);
     }
-  } |
+  }
+;
 
-  K_BUFF TKN_EQUAL num_list {
-    { 
-      TOKEN * t;
-      int pin;
+prog_parm_type:
+  K_TYPE TKN_EQUAL prog_parm_type_id
+;
 
-      current_prog->pinno[PPI_AVR_BUFF] = 0;
-
-      while (lsize(number_list)) {
-        t = lrmv_n(number_list, 1);
-        pin = t->value.number;
-        current_prog->pinno[PPI_AVR_BUFF] |= (1 << pin);
-
-        free_token(t);
-      }
+prog_parm_type_id:
+  TKN_STRING        {
+  const struct programmer_type_t * pgm_type = locate_programmer_type($1->value.string);
+    if (pgm_type == NULL) {
+        fprintf(stderr,
+                "%s: error at %s:%d: programmer type %s not found\n",
+                progname, infile, lineno, $1->value.string);
+        exit(1);
     }
-  } |
+    current_prog->initpgm = pgm_type->initpgm;
+    free_token($1); 
+}
+  | error
+{
+        fprintf(stderr,
+                "%s: error at %s:%d: programmer type must be written as \"id_type\"\n",
+                progname, infile, lineno);
+        exit(1);
+}
+;
+
+prog_parm_conntype:
+  K_CONNTYPE TKN_EQUAL prog_parm_conntype_id
+;
+
+prog_parm_conntype_id:
+  K_PARALLEL        { current_prog->conntype = CONNTYPE_PARALLEL; } |
+  K_SERIAL          { current_prog->conntype = CONNTYPE_SERIAL; } |
+  K_USB             { current_prog->conntype = CONNTYPE_USB; }
+;
+
+prog_parm_usb:
   K_USBDEV TKN_EQUAL TKN_STRING {
     {
       strncpy(current_prog->usbdev, $3->value.string, PGM_USBSTRINGLEN);
@@ -636,15 +512,10 @@ prog_parm :
   K_USBVID TKN_EQUAL TKN_NUMBER {
     {
       current_prog->usbvid = $3->value.number;
+      free_token($3);
     }
   } |
-
-  K_USBPID TKN_EQUAL TKN_NUMBER {
-    {
-      current_prog->usbpid = $3->value.number;
-    }
-  } |
-
+  K_USBPID TKN_EQUAL usb_pid_list |
   K_USBSN TKN_EQUAL TKN_STRING {
     {
       strncpy(current_prog->usbsn, $3->value.string, PGM_USBSTRINGLEN);
@@ -652,7 +523,6 @@ prog_parm :
       free_token($3);
     }
   } |
-  
   K_USBVENDOR TKN_EQUAL TKN_STRING {
     {
       strncpy(current_prog->usbvendor, $3->value.string, PGM_USBSTRINGLEN);
@@ -660,44 +530,81 @@ prog_parm :
       free_token($3);
     }
   } |
-
   K_USBPRODUCT TKN_EQUAL TKN_STRING {
     {
       strncpy(current_prog->usbproduct, $3->value.string, PGM_USBSTRINGLEN);
       current_prog->usbproduct[PGM_USBSTRINGLEN-1] = 0;
       free_token($3);
     }
-  } |
-  
-  K_BAUDRATE TKN_EQUAL TKN_NUMBER {
-    {
-      current_prog->baudrate = $3->value.number;
-    }
-  } |
-
-  K_RESET  TKN_EQUAL TKN_NUMBER { free_token($1); 
-                                  assign_pin(PIN_AVR_RESET, $3, 0); } |
-  K_SCK    TKN_EQUAL TKN_NUMBER { free_token($1); 
-                                  assign_pin(PIN_AVR_SCK, $3, 0); } |
-  K_MOSI   TKN_EQUAL TKN_NUMBER { assign_pin(PIN_AVR_MOSI, $3, 0); } |
-  K_MISO   TKN_EQUAL TKN_NUMBER { assign_pin(PIN_AVR_MISO, $3, 0); } |
-  K_ERRLED TKN_EQUAL TKN_NUMBER { assign_pin(PIN_LED_ERR, $3, 0); } |
-  K_RDYLED TKN_EQUAL TKN_NUMBER { assign_pin(PIN_LED_RDY, $3, 0); } |
-  K_PGMLED TKN_EQUAL TKN_NUMBER { assign_pin(PIN_LED_PGM, $3, 0); } |
-  K_VFYLED TKN_EQUAL TKN_NUMBER { assign_pin(PIN_LED_VFY, $3, 0); } |
-
-  K_RESET  TKN_EQUAL TKN_TILDE TKN_NUMBER { free_token($1); 
-                                  assign_pin(PIN_AVR_RESET, $4, 1); } |
-  K_SCK    TKN_EQUAL TKN_TILDE TKN_NUMBER { free_token($1); 
-                                  assign_pin(PIN_AVR_SCK, $4, 1); } |
-  K_MOSI   TKN_EQUAL TKN_TILDE TKN_NUMBER { assign_pin(PIN_AVR_MOSI, $4, 1); } |
-  K_MISO   TKN_EQUAL TKN_TILDE TKN_NUMBER { assign_pin(PIN_AVR_MISO, $4, 1); } |
-  K_ERRLED TKN_EQUAL TKN_TILDE TKN_NUMBER { assign_pin(PIN_LED_ERR, $4, 1); } |
-  K_RDYLED TKN_EQUAL TKN_TILDE TKN_NUMBER { assign_pin(PIN_LED_RDY, $4, 1); } |
-  K_PGMLED TKN_EQUAL TKN_TILDE TKN_NUMBER { assign_pin(PIN_LED_PGM, $4, 1); } |
-  K_VFYLED TKN_EQUAL TKN_TILDE TKN_NUMBER { assign_pin(PIN_LED_VFY, $4, 1); }
+  }
 ;
 
+usb_pid_list:
+  TKN_NUMBER {
+    {
+      int *ip = malloc(sizeof(int));
+      if (ip) {
+        *ip = $1->value.number;
+        ladd(current_prog->usbpid, ip);
+      }
+      free_token($1);
+    }
+  } |
+  usb_pid_list TKN_COMMA TKN_NUMBER {
+    {
+      int *ip = malloc(sizeof(int));
+      if (ip) {
+        *ip = $3->value.number;
+        ladd(current_prog->usbpid, ip);
+      }
+      free_token($3);
+    }
+  }
+;
+
+pin_number_non_empty:
+  TKN_NUMBER { assign_pin(pin_name, $1, 0);  }
+  |
+  TKN_TILDE TKN_NUMBER { assign_pin(pin_name, $2, 1); }
+;
+
+pin_number:
+  pin_number_non_empty
+  |
+  /* empty */ { pin_clear_all(&(current_prog->pin[pin_name])); }
+;
+
+pin_list_element:
+  pin_number_non_empty
+  |
+  TKN_TILDE TKN_LEFT_PAREN num_list TKN_RIGHT_PAREN { assign_pin_list(1); }
+;
+
+pin_list_non_empty:
+  pin_list_element
+  |
+  pin_list_non_empty TKN_COMMA pin_list_element
+;
+
+
+pin_list:
+  pin_list_non_empty
+  |
+  /* empty */ { pin_clear_all(&(current_prog->pin[pin_name])); }
+;
+
+prog_parm_pins:
+  K_VCC    TKN_EQUAL {pin_name = PPI_AVR_VCC;  } pin_list |
+  K_BUFF   TKN_EQUAL {pin_name = PPI_AVR_BUFF; } pin_list |
+  K_RESET  TKN_EQUAL {pin_name = PIN_AVR_RESET;} pin_number { free_token($1); } |
+  K_SCK    TKN_EQUAL {pin_name = PIN_AVR_SCK;  } pin_number { free_token($1); } |
+  K_MOSI   TKN_EQUAL {pin_name = PIN_AVR_MOSI; } pin_number |
+  K_MISO   TKN_EQUAL {pin_name = PIN_AVR_MISO; } pin_number |
+  K_ERRLED TKN_EQUAL {pin_name = PIN_LED_ERR;  } pin_number |
+  K_RDYLED TKN_EQUAL {pin_name = PIN_LED_RDY;  } pin_number |
+  K_PGMLED TKN_EQUAL {pin_name = PIN_LED_PGM;  } pin_number |
+  K_VFYLED TKN_EQUAL {pin_name = PIN_LED_VFY;  } pin_number
+;
 
 opcode :
   K_READ         |
@@ -783,25 +690,24 @@ part_parm :
     }
   } |
 
+ K_USBPID TKN_EQUAL TKN_NUMBER {
+    {
+      current_part->usbpid = $3->value.number;
+      free_token($3);
+    }
+  } |
+
   K_PP_CONTROLSTACK TKN_EQUAL num_list {
     {
       TOKEN * t;
       unsigned nbytes;
       int ok;
 
-      if (current_part->ctl_stack_type != CTL_STACK_NONE)
-	{
-	  fprintf(stderr,
-		  "%s: error at line %d of %s: "
-		  "control stack already defined\n",
-		  progname, lineno, infile);
-	  exit(1);
-	}
-
       current_part->ctl_stack_type = CTL_STACK_PP;
       nbytes = 0;
       ok = 1;
 
+      memset(current_part->controlstack, 0, CTL_STACK_SIZE);
       while (lsize(number_list)) {
         t = lrmv_n(number_list, 1);
 	if (nbytes < CTL_STACK_SIZE)
@@ -831,19 +737,11 @@ part_parm :
       unsigned nbytes;
       int ok;
 
-      if (current_part->ctl_stack_type != CTL_STACK_NONE)
-	{
-	  fprintf(stderr,
-		  "%s: error at line %d of %s: "
-		  "control stack already defined\n",
-		  progname, lineno, infile);
-	  exit(1);
-	}
-
       current_part->ctl_stack_type = CTL_STACK_HVSP;
       nbytes = 0;
       ok = 1;
 
+      memset(current_part->controlstack, 0, CTL_STACK_SIZE);
       while (lsize(number_list)) {
         t = lrmv_n(number_list, 1);
 	if (nbytes < CTL_STACK_SIZE)
@@ -876,6 +774,7 @@ part_parm :
       nbytes = 0;
       ok = 1;
 
+      memset(current_part->flash_instr, 0, FLASH_INSTR_SIZE);
       while (lsize(number_list)) {
         t = lrmv_n(number_list, 1);
 	if (nbytes < FLASH_INSTR_SIZE)
@@ -908,6 +807,7 @@ part_parm :
       nbytes = 0;
       ok = 1;
 
+      memset(current_part->eeprom_instr, 0, EEPROM_INSTR_SIZE);
       while (lsize(number_list)) {
         t = lrmv_n(number_list, 1);
 	if (nbytes < EEPROM_INSTR_SIZE)
@@ -1172,7 +1072,7 @@ part_parm :
       if ($3->primary == K_YES)
         current_part->flags |= AVRPART_IS_AT90S1200;
       else if ($3->primary == K_NO)
-        current_part->flags &= AVRPART_IS_AT90S1200;
+        current_part->flags &= ~AVRPART_IS_AT90S1200;
 
       free_token($3);
     } |
@@ -1182,7 +1082,7 @@ part_parm :
       if ($3->primary == K_YES)
         current_part->flags |= AVRPART_AVR32;
       else if ($3->primary == K_NO)
-        current_part->flags &= AVRPART_AVR32;
+        current_part->flags &= ~AVRPART_AVR32;
 
       free_token($3);
     } |
@@ -1231,9 +1131,21 @@ part_parm :
       free_token($3);
     } |
 
+  K_MCU_BASE TKN_EQUAL TKN_NUMBER
+    {
+      current_part->mcu_base = $3->value.number;
+      free_token($3);
+    } |
+
   K_NVM_BASE TKN_EQUAL TKN_NUMBER
     {
       current_part->nvm_base = $3->value.number;
+      free_token($3);
+    } |
+
+  K_OCDREV          TKN_EQUAL TKN_NUMBER
+    {
+      current_part->ocdrev = $3->value.number;
       free_token($3);
     } |
 
@@ -1292,11 +1204,19 @@ part_parm :
   K_MEMORY TKN_STRING 
     { 
       current_mem = avr_new_memtype(); 
-      strcpy(current_mem->desc, strdup($2->value.string)); 
+      strncpy(current_mem->desc, $2->value.string, AVR_MEMDESCLEN); 
+      current_mem->desc[AVR_MEMDESCLEN-1] = 0;
       free_token($2); 
     } 
     mem_specs 
     { 
+      AVRMEM * existing_mem;
+
+      existing_mem = avr_locate_mem(current_part, current_mem->desc);
+      if (existing_mem != NULL) {
+        lrmv_d(current_part->mem, existing_mem);
+        avr_free_mem(existing_mem);
+      }
       ladd(current_part->mem, current_mem); 
       current_mem = NULL; 
     } |
@@ -1309,6 +1229,12 @@ part_parm :
       opnum = which_opcode($1);
       op = avr_new_opcode();
       parse_cmdbits(op);
+      if (current_part->op[opnum] != NULL) {
+        /*fprintf(stderr,
+              "%s: warning at %s:%d: operation redefined\n",
+              progname, infile, lineno);*/
+        avr_free_opcode(current_part->op[opnum]);
+      }
       current_part->op[opnum] = op;
 
       free_token($1);
@@ -1430,6 +1356,12 @@ mem_spec :
       opnum = which_opcode($1);
       op = avr_new_opcode();
       parse_cmdbits(op);
+      if (current_mem->op[opnum] != NULL) {
+        /*fprintf(stderr,
+              "%s: warning at %s:%d: operation redefined\n",
+              progname, infile, lineno);*/
+        avr_free_opcode(current_mem->op[opnum]);
+      }
       current_mem->op[opnum] = op;
 
       free_token($1);
@@ -1444,7 +1376,8 @@ mem_spec :
 static char * vtypestr(int type)
 {
   switch (type) {
-    case V_NUM : return "NUMERIC";
+    case V_NUM : return "INTEGER";
+    case V_NUM_REAL: return "REAL";
     case V_STR : return "STRING";
     default:
       return "<UNKNOWN>";
@@ -1458,22 +1391,44 @@ static int assign_pin(int pinno, TOKEN * v, int invert)
   int value;
 
   value = v->value.number;
+  free_token(v);
 
-  if ((value <= 0) || (value >= 18)) {
+  if ((value < PIN_MIN) || (value > PIN_MAX)) {
     fprintf(stderr, 
             "%s: error at line %d of %s: pin must be in the "
-            "range 1-17\n",
-            progname, lineno, infile);
+            "range %d-%d\n",
+            progname, lineno, infile, PIN_MIN, PIN_MAX);
     exit(1);
   }
-  if (invert)
-    value |= PIN_INVERSE;
 
-  current_prog->pinno[pinno] = value;
+  pin_set_value(&(current_prog->pin[pinno]), value, invert);
 
   return 0;
 }
 
+static int assign_pin_list(int invert)
+{
+  TOKEN * t;
+  int pin;
+
+  current_prog->pinno[pin_name] = 0;
+  while (lsize(number_list)) {
+    t = lrmv_n(number_list, 1);
+    pin = t->value.number;
+    if ((pin < PIN_MIN) || (pin > PIN_MAX)) {
+      fprintf(stderr, 
+            "%s: error at line %d of %s: pin must be in the "
+            "range %d-%d\n",
+            progname, lineno, infile, PIN_MIN, PIN_MAX);
+      exit(1);
+      /* TODO clear list and free tokens if no exit is done */
+    }
+    pin_set_value(&(current_prog->pin[pin_name]), pin, invert);
+    free_token(t);
+  }
+
+  return 0;
+}
 
 static int which_opcode(TOKEN * opcode)
 {

@@ -13,11 +13,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: stk500generic.c 824 2009-07-02 09:11:45Z joerg_wunsch $ */
+/* $Id: stk500generic.c 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 /*
  * avrdude interface for Atmel STK500 programmer
@@ -34,6 +33,7 @@
 
 #include "avrdude.h"
 #include "pgm.h"
+#include "stk500generic.h"
 #include "stk500.h"
 #include "stk500v2.h"
 
@@ -80,6 +80,7 @@ static void stk500generic_teardown(PROGRAMMER * pgm)
   pgm->teardown(pgm);
 }
 
+const char stk500generic_desc[] = "Atmel STK500, autodetect firmware version";
 
 void stk500generic_initpgm(PROGRAMMER * pgm)
 {

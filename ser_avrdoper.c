@@ -15,11 +15,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: ser_avrdoper.c 981 2011-08-25 19:03:10Z joerg_wunsch $ */
+/* $Id: ser_avrdoper.c 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 /*
  * Serial Interface emulation for USB programmer "AVR-Doper" in HID mode.
@@ -248,7 +247,13 @@ static int usbGetReport(union filedescriptor *fdp, int reportType, int reportNum
 /* ------------------------------------------------------------------------ */
 /* ------------------------------------------------------------------------ */
 
-#include <usb.h>
+#if defined(HAVE_USB_H)
+#  include <usb.h>
+#elif defined(HAVE_LUSB0_USB_H)
+#  include <lusb0_usb.h>
+#else
+#  error "libusb needs either <usb.h> or <lusb0_usb.h>"
+#endif
 
 /* ------------------------------------------------------------------------- */
 
@@ -505,7 +510,7 @@ static char *usbErrorText(int usbErrno)
 
 /* ------------------------------------------------------------------------- */
 
-static int avrdoper_open(char *port, long baud, union filedescriptor *fdp)
+static int avrdoper_open(char *port, union pinfo pinfo, union filedescriptor *fdp)
 {
     int rval;
     char *vname = "obdev.at";

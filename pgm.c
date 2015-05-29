@@ -14,11 +14,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: pgm.c 976 2011-08-23 21:03:36Z joerg_wunsch $ */
+/* $Id: pgm.c 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 #include "ac_cfg.h"
 
@@ -77,14 +76,18 @@ PROGRAMMER * pgm_new(void)
   memset(pgm, 0, sizeof(*pgm));
 
   pgm->id = lcreat(NULL, 0);
+  pgm->usbpid = lcreat(NULL, 0);
   pgm->desc[0] = 0;
   pgm->type[0] = 0;
   pgm->config_file[0] = 0;
   pgm->lineno = 0;
   pgm->baudrate = 0;
+  pgm->initpgm = NULL;
 
-  for (i=0; i<N_PINS; i++)
+  for (i=0; i<N_PINS; i++) {
     pgm->pinno[i] = 0;
+    pin_clear_all(&(pgm->pin[i]));
+  }
 
   /*
    * mandatory functions - these are called without checking to see
@@ -135,6 +138,36 @@ PROGRAMMER * pgm_new(void)
   return pgm;
 }
 
+void pgm_free(PROGRAMMER * const p)
+{
+  ldestroy_cb(p->id, free);
+  p->id = NULL;
+  /* this is done by pgm_teardown, but usually cookie is not set to NULL */
+  /* if (p->cookie !=NULL) {
+    free(p->cookie);
+    p->cookie = NULL;
+  }*/
+  free(p);
+}
+
+PROGRAMMER * pgm_dup(const PROGRAMMER * const src)
+{
+  PROGRAMMER * pgm;
+
+  pgm = (PROGRAMMER *)malloc(sizeof(*pgm));
+  if (pgm == NULL) {
+    fprintf(stderr, "%s: out of memory allocating programmer structure\n",
+            progname);
+    exit(1);
+  }
+
+  memcpy(pgm, src, sizeof(*pgm));
+
+  pgm->id = lcreat(NULL, 0);
+
+  return pgm;
+}
+
 
 static void pgm_default(void)
 {
@@ -181,6 +214,36 @@ void programmer_display(PROGRAMMER * pgm, const char * p)
   pgm->display(pgm, p);
 }
 
+
+void pgm_display_generic_mask(PROGRAMMER * pgm, const char * p, unsigned int show)
+{
+  if(show & (1<<PPI_AVR_VCC)) 
+    fprintf(stderr, "%s  VCC     = %s\n", p, pins_to_str(&pgm->pin[PPI_AVR_VCC]));
+  if(show & (1<<PPI_AVR_BUFF))
+    fprintf(stderr, "%s  BUFF    = %s\n", p, pins_to_str(&pgm->pin[PPI_AVR_BUFF]));
+  if(show & (1<<PIN_AVR_RESET))
+    fprintf(stderr, "%s  RESET   = %s\n", p, pins_to_str(&pgm->pin[PIN_AVR_RESET]));
+  if(show & (1<<PIN_AVR_SCK))
+    fprintf(stderr, "%s  SCK     = %s\n", p, pins_to_str(&pgm->pin[PIN_AVR_SCK]));
+  if(show & (1<<PIN_AVR_MOSI))
+    fprintf(stderr, "%s  MOSI    = %s\n", p, pins_to_str(&pgm->pin[PIN_AVR_MOSI]));
+  if(show & (1<<PIN_AVR_MISO))
+    fprintf(stderr, "%s  MISO    = %s\n", p, pins_to_str(&pgm->pin[PIN_AVR_MISO]));
+  if(show & (1<<PIN_LED_ERR))
+    fprintf(stderr, "%s  ERR LED = %s\n", p, pins_to_str(&pgm->pin[PIN_LED_ERR]));
+  if(show & (1<<PIN_LED_RDY))
+    fprintf(stderr, "%s  RDY LED = %s\n", p, pins_to_str(&pgm->pin[PIN_LED_RDY]));
+  if(show & (1<<PIN_LED_PGM))
+    fprintf(stderr, "%s  PGM LED = %s\n", p, pins_to_str(&pgm->pin[PIN_LED_PGM]));
+  if(show & (1<<PIN_LED_VFY))
+    fprintf(stderr, "%s  VFY LED = %s\n", p, pins_to_str(&pgm->pin[PIN_LED_VFY]));
+}
+
+void pgm_display_generic(PROGRAMMER * pgm, const char * p)
+{
+  pgm_display_generic_mask(pgm, p, SHOW_ALL_PINS);
+}
+
 PROGRAMMER * locate_programmer(LISTID programmers, const char * configid)
 {
   LNODEID ln1, ln2;
@@ -218,11 +281,37 @@ PROGRAMMER * locate_programmer(LISTID programmers, const char * configid)
 void walk_programmers(LISTID programmers, walk_programmers_cb cb, void *cookie)
 {
   LNODEID ln1;
+  LNODEID ln2;
   PROGRAMMER * p;
 
   for (ln1 = lfirst(programmers); ln1; ln1 = lnext(ln1)) {
     p = ldata(ln1);
-    cb((char *)ldata(lfirst(p->id)), p->desc, p->config_file, p->lineno, cookie);
+    for (ln2=lfirst(p->id); ln2; ln2=lnext(ln2)) {
+      cb(ldata(ln2), p->desc, p->config_file, p->lineno, cookie);
+    }
   }
+}
+
+/*
+ * Compare function to sort the list of programmers
+ */
+static int sort_programmer_compare(PROGRAMMER * p1,PROGRAMMER * p2)
+{
+  char* id1;
+  char* id2;
+  if(p1 == NULL || p2 == NULL) {
+    return 0;
+  }
+  id1 = ldata(lfirst(p1->id));
+  id2 = ldata(lfirst(p2->id));
+  return strncasecmp(id1,id2,AVR_IDLEN);
+}
+
+/*
+ * Sort the list of programmers given as "programmers"
+ */
+void sort_programmers(LISTID programmers)
+{
+  lsort(programmers,(int (*)(void*, void*)) sort_programmer_compare);
 }
 

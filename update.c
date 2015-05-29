@@ -14,11 +14,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: update.c 1007 2011-09-14 21:49:42Z joerg_wunsch $ */
+/* $Id: update.c 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,17 +53,13 @@ UPDATE * parse_op(char * s)
   buf[i] = 0;
 
   if (*p != ':') {
-    upd->memtype = (char *)malloc(strlen("flash")+1);
-    if (upd->memtype == NULL) {
-      outofmem:
-      fprintf(stderr, "%s: out of memory\n", progname);
-      exit(1);
-    }
-    strcpy(upd->memtype, "flash");
+    upd->memtype = NULL;        /* default memtype, "flash", or "application" */
     upd->op = DEVICE_WRITE;
     upd->filename = (char *)malloc(strlen(buf) + 1);
-    if (upd->filename == NULL)
-      goto outofmem;
+    if (upd->filename == NULL) {
+        fprintf(stderr, "%s: out of memory\n", progname);
+        exit(1);
+    }
     strcpy(upd->filename, buf);
     upd->format = FMT_AUTO;
     return upd;
@@ -138,6 +133,7 @@ UPDATE * parse_op(char * s)
       case 's': upd->format = FMT_SREC; break;
       case 'i': upd->format = FMT_IHEX; break;
       case 'r': upd->format = FMT_RBIN; break;
+      case 'e': upd->format = FMT_ELF; break;
       case 'm': upd->format = FMT_IMM; break;
       case 'b': upd->format = FMT_BIN; break;
       case 'd': upd->format = FMT_DEC; break;
@@ -176,7 +172,10 @@ UPDATE * dup_update(UPDATE * upd)
 
   memcpy(u, upd, sizeof(UPDATE));
 
-  u->memtype = strdup(upd->memtype);
+  if (upd->memtype != NULL)
+    u->memtype = strdup(upd->memtype);
+  else
+    u->memtype = NULL;
   u->filename = strdup(upd->filename);
 
   return u;
@@ -200,7 +199,23 @@ UPDATE * new_update(int op, char * memtype, int filefmt, char * filename)
   return u;
 }
 
-int do_op(PROGRAMMER * pgm, struct avrpart * p, UPDATE * upd, int nowrite)
+void free_update(UPDATE * u)
+{
+    if (u != NULL) {
+	if(u->memtype != NULL) {
+	    free(u->memtype);
+	    u->memtype = NULL;
+	}
+	if(u->filename != NULL) {
+	    free(u->filename);
+	    u->filename = NULL;
+	}
+	free(u);
+    }
+}
+
+
+int do_op(PROGRAMMER * pgm, struct avrpart * p, UPDATE * upd, enum updateflags flags)
 {
   struct avrpart * v;
   AVRMEM * mem;
@@ -223,7 +238,7 @@ int do_op(PROGRAMMER * pgm, struct avrpart * p, UPDATE * upd, int nowrite)
             progname, mem->desc);
 	  }
     report_progress(0,1,"Reading");
-    rc = avr_read(pgm, p, upd->memtype, 0, 1);
+    rc = avr_read(pgm, p, upd->memtype, 0);
     if (rc < 0) {
       fprintf(stderr, "%s: failed to read all of %s memory, rc=%d\n",
               progname, mem->desc, rc);
@@ -272,9 +287,9 @@ int do_op(PROGRAMMER * pgm, struct avrpart * p, UPDATE * upd, int nowrite)
             progname, mem->desc, size);
 	  }
 
-    if (!nowrite) {
+    if (!(flags & UF_NOWRITE)) {
       report_progress(0,1,"Writing");
-      rc = avr_write(pgm, p, upd->memtype, size, 1);
+      rc = avr_write(pgm, p, upd->memtype, size, (flags & UF_AUTO_ERASE) != 0);
       report_progress(1,1,NULL);
     }
     else {
@@ -330,7 +345,7 @@ int do_op(PROGRAMMER * pgm, struct avrpart * p, UPDATE * upd, int nowrite)
     }
 
     report_progress (0,1,"Reading");
-    rc = avr_read(pgm, p, upd->memtype, v, 1);
+    rc = avr_read(pgm, p, upd->memtype, v);
     if (rc < 0) {
       fprintf(stderr, "%s: failed to read all of %s memory, rc=%d\n",
               progname, mem->desc, rc);

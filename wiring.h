@@ -13,15 +13,15 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: wiring.h 987 2011-08-26 20:22:09Z joerg_wunsch $ */
+/* $Id: wiring.h 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 #ifndef wiring_h__
 #define wiring_h__
 
+extern const char wiring_desc[];
 void wiring_initpgm(PROGRAMMER * pgm);
 
 #endif

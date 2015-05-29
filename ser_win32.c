@@ -14,11 +14,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: ser_win32.c 949 2010-10-22 14:44:53Z springob $ */
+/* $Id: ser_win32.c 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 /*
  * Native Win32 serial interface for avrdude.
@@ -112,7 +111,7 @@ static int ser_setspeed(union filedescriptor *fd, long baud)
 }
 
 
-static int ser_open(char * port, long baud, union filedescriptor *fdp)
+static int ser_open(char * port, union pinfo pinfo, union filedescriptor *fdp)
 {
 	LPVOID lpMsgBuf;
 	HANDLE hComPort=INVALID_HANDLE_VALUE;
@@ -178,7 +177,7 @@ static int ser_open(char * port, long baud, union filedescriptor *fdp)
 	}
 
         fdp->pfd = (void *)hComPort;
-	if (ser_setspeed(fdp, baud) != 0)
+	if (ser_setspeed(fdp, pinfo.baud) != 0)
 	{
 		CloseHandle(hComPort);
 		fprintf(stderr, "%s: ser_open(): can't set com-state for \"%s\"\n",
@@ -312,6 +311,15 @@ static int ser_recv(union filedescriptor *fd, unsigned char * buf, size_t buflen
 			      progname, (char*)lpMsgBuf);
 		LocalFree( lpMsgBuf );
 		exit(1);
+	}
+
+	/* time out detected */
+	if (read == 0) {
+		if (verbose > 1)
+		fprintf(stderr,
+			"%s: ser_recv(): programmer is not responding\n",
+			progname);
+		return -1;
 	}
 
 	p = buf;

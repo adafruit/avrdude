@@ -1,6 +1,6 @@
 ## -*- mode: rpm-spec; -*-
 ##
-## $Id: avrdude.spec.in 558 2005-11-29 20:28:51Z joerg_wunsch $
+## $Id: avrdude.spec.in 1294 2014-03-12 23:03:18Z joerg_wunsch $
 ##
 ## @configure_input@
 ##

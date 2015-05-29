@@ -45,7 +45,10 @@
 #define CMD_READ_LOCK_ISP                   0x1A
 #define CMD_READ_SIGNATURE_ISP              0x1B
 #define CMD_READ_OSCCAL_ISP                 0x1C
-#define CMD_SPI_MULTI                       0x1D
+#define CMD_SPI_MULTI                       0x1D /* STK500v2, AVRISPmkII,
+						  * JTAGICEmkII */
+#define CMD_SET_SCK                         0x1D /* JTAGICE3 */
+#define CMD_GET_SCK                         0x1E /* JTAGICE3 */
 
 // *****************[ STK PP command constants ]*******************************
 
@@ -307,10 +310,14 @@ struct pdata
         PGMTYPE_AVRISP_MKII,
         PGMTYPE_JTAGICE_MKII,
         PGMTYPE_STK600,
+        PGMTYPE_JTAGICE3
     }
         pgmtype;
 
   AVRPART *lastpart;
+
+  /* Start address of Xmega boot area */
+  unsigned long boot_start;
 
   /*
    * Chained pdata for the JTAG ICE mkII backend.  This is used when

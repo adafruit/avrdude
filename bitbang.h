@@ -15,10 +15,9 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-/* $Id: bitbang.h 978 2011-08-24 07:40:48Z joerg_wunsch $ */
+/* $Id: bitbang.h 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 #ifndef bitbang_h
 #define bitbang_h
@@ -38,12 +37,12 @@ int  bitbang_rdy_led        (PROGRAMMER * pgm, int value);
 int  bitbang_err_led        (PROGRAMMER * pgm, int value);
 int  bitbang_pgm_led        (PROGRAMMER * pgm, int value);
 int  bitbang_vfy_led        (PROGRAMMER * pgm, int value);
-int  bitbang_cmd            (PROGRAMMER * pgm, unsigned char cmd[4],
-                                unsigned char res[4]);
-int  bitbang_cmd_tpi        (PROGRAMMER * pgm, unsigned char cmd[], 
-                                int cmd_len, unsigned char res[], int res_len);
-int  bitbang_spi            (PROGRAMMER * pgm, unsigned char cmd[],
-                                unsigned char res[], int count);
+int  bitbang_cmd            (PROGRAMMER * pgm, const unsigned char *cmd,
+                                unsigned char *res);
+int  bitbang_cmd_tpi        (PROGRAMMER * pgm, const unsigned char *cmd,
+                                int cmd_len, unsigned char *res, int res_len);
+int  bitbang_spi            (PROGRAMMER * pgm, const unsigned char *cmd,
+                                unsigned char *res, int count);
 int  bitbang_chip_erase     (PROGRAMMER * pgm, AVRPART * p);
 int  bitbang_program_enable (PROGRAMMER * pgm, AVRPART * p);
 void bitbang_powerup        (PROGRAMMER * pgm);

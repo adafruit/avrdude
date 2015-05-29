@@ -14,11 +14,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: avrpart.h 1007 2011-09-14 21:49:42Z joerg_wunsch $ */
+/* $Id: avrpart.h 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 #ifndef avrpart_h
 #define avrpart_h
@@ -112,6 +111,7 @@ typedef struct avrpart {
   unsigned char pagel;              /* for parallel programming */
   unsigned char bs2;                /* for parallel programming */
   unsigned char signature[3];       /* expected value of signature bytes */
+  unsigned short usbpid;            /* USB DFU product ID (0 = none) */
   int           reset_disposition;  /* see RESET_ enums */
   int           retry_pulse;        /* retry program enable by pulsing
                                        this pin (PIN_AVR_*) */
@@ -156,7 +156,9 @@ typedef struct avrpart {
   unsigned char rampz;              /* JTAG ICE mkII XML file parameter */
   unsigned char spmcr;              /* JTAG ICE mkII XML file parameter */
   unsigned short eecr;              /* JTAC ICE mkII XML file parameter */
+  unsigned int mcu_base;            /* Base address of MCU control block in ATxmega devices */
   unsigned int nvm_base;            /* Base address of NVM controller in ATxmega devices */
+  int           ocdrev;             /* OCD revision (JTAGICE3 parameter, from AS6 XML files) */
 
   OPCODE      * op[AVR_OP_MAX];     /* opcodes */
 
@@ -178,7 +180,7 @@ typedef struct avrmem {
   int pwroff_after_write;     /* after this memory type is written to,
                                  the device must be powered off and
                                  back on, see errata
-                                 http://www.atmel.com/atmel/acrobat/doc1280.pdf */
+                                 http://www.atmel.com/dyn/resources/prod_documents/doc1280.pdf */
   unsigned char readback[2];  /* polled read-back values */
 
   int mode;                   /* stk500 v2 xml file parameter */
@@ -198,15 +200,18 @@ extern "C" {
 
 /* Functions for OPCODE structures */
 OPCODE * avr_new_opcode(void);
+void     avr_free_opcode(OPCODE * op);
 int avr_set_bits(OPCODE * op, unsigned char * cmd);
 int avr_set_addr(OPCODE * op, unsigned char * cmd, unsigned long addr);
 int avr_set_input(OPCODE * op, unsigned char * cmd, unsigned char data);
 int avr_get_output(OPCODE * op, unsigned char * res, unsigned char * data);
+int avr_get_output_index(OPCODE * op);
 
 /* Functions for AVRMEM structures */
 AVRMEM * avr_new_memtype(void);
 int avr_initmem(AVRPART * p);
 AVRMEM * avr_dup_mem(AVRMEM * m);
+void     avr_free_mem(AVRMEM * m);
 AVRMEM * avr_locate_mem(AVRPART * p, char * desc);
 void avr_mem_display(const char * prefix, FILE * f, AVRMEM * m, int type,
                      int verbose);
@@ -214,6 +219,7 @@ void avr_mem_display(const char * prefix, FILE * f, AVRMEM * m, int type,
 /* Functions for AVRPART structures */
 AVRPART * avr_new_part(void);
 AVRPART * avr_dup_part(AVRPART * d);
+void      avr_free_part(AVRPART * d);
 AVRPART * locate_part(LISTID parts, char * partdesc);
 AVRPART * locate_part_by_avr910_devcode(LISTID parts, int devcode);
 void avr_display(FILE * f, AVRPART * p, const char * prefix, int verbose);
@@ -221,8 +227,8 @@ void avr_display(FILE * f, AVRPART * p, const char * prefix, int verbose);
 typedef void (*walk_avrparts_cb)(const char *name, const char *desc,
                                  const char *cfgname, int cfglineno,
                                  void *cookie);
-void walk_avrparts(LISTID programmers, walk_avrparts_cb cb, void *cookie);
-
+void walk_avrparts(LISTID avrparts, walk_avrparts_cb cb, void *cookie);
+void sort_avrparts(LISTID avrparts);
 #ifdef __cplusplus
 }
 #endif

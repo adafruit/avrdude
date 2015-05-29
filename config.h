@@ -13,11 +13,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: config.h 988 2011-08-26 20:30:26Z joerg_wunsch $ */
+/* $Id: config.h 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 #ifndef config_h
 #define config_h
@@ -29,11 +28,14 @@
 
 #define MAX_STR_CONST 1024
 
-enum { V_NONE, V_NUM, V_STR };
+enum { V_NONE, V_NUM, V_NUM_REAL, V_STR };
 typedef struct value_t {
   int      type;
-  double   number;
-  char   * string;
+  /*union { TODO: use an anonymous union here ? */
+    int      number;
+    double   number_real;
+    char   * string;
+  /*};*/
 } VALUE;
 
 
@@ -58,7 +60,11 @@ extern char         default_programmer[];
 extern char         default_parallel[];
 extern char         default_serial[];
 extern double       default_bitclock;
+extern int          default_safemode;
 
+/* This name is fixed, it's only here for symmetry with
+ * default_parallel and default_serial. */
+#define DEFAULT_USB "usb"
 
 
 #if !defined(HAS_YYSTYPE)
@@ -78,6 +84,8 @@ int yyparse(void);
 
 int init_config(void);
 
+void cleanup_config(void);
+
 TOKEN * new_token(int primary);
 
 void free_token(TOKEN * tkn);
@@ -86,11 +94,11 @@ void free_tokens(int n, ...);
 
 TOKEN * number(char * text);
 
+TOKEN * number_real(char * text);
+
 TOKEN * hexnumber(char * text);
 
 TOKEN * string(char * text);
-
-TOKEN * id(char * text);
 
 TOKEN * keyword(int primary);
 

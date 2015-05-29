@@ -13,11 +13,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: wiring.c 989 2011-08-26 20:35:40Z joerg_wunsch $ */
+/* $Id: wiring.c 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 /*
  * avrdude interface for Wiring bootloaders
@@ -51,6 +50,7 @@
 #include "stk500v2_private.h"
 #include "stk500v2.h"
 #include "serial.h"
+#include "wiring.h"
 
 /*
  * Private data for this programmer.
@@ -153,9 +153,11 @@ static int wiring_open(PROGRAMMER * pgm, char * port)
 {
   int timetosnooze;
   void *mycookie = STK500V2PDATA(pgm)->chained_pdata;
+  union pinfo pinfo;
 
   strcpy(pgm->port, port);
-  serial_open(port, pgm->baudrate ? pgm->baudrate: 115200, &pgm->fd);
+  pinfo.baud = pgm->baudrate ? pgm->baudrate: 115200;
+  serial_open(port, pinfo, &pgm->fd);
 
   /* If we have a snoozetime, then we wait and do NOT toggle DTR/RTS */
 
@@ -218,6 +220,8 @@ static void wiring_close(PROGRAMMER * pgm)
   serial_close(&pgm->fd);
   pgm->fd.ifd = -1;
 }
+
+const char wiring_desc[] = "http://wiring.org.co/, Basically STK500v2 protocol, with some glue to trigger the bootloader.";
 
 void wiring_initpgm(PROGRAMMER * pgm)
 {

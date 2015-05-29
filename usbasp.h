@@ -13,26 +13,15 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: usbasp.h 961 2011-05-28 07:35:40Z fischl $ */
+/* $Id: usbasp.h 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 #ifndef usbasp_h
 #define usbasp_h
 
 #include "avrpart.h"
-
-/* USB identifiers */
-#define	USBASP_SHARED_VID   0x16C0  /* VOTI */
-#define	USBASP_SHARED_PID   0x05DC  /* Obdev's free shared PID */
-
-#define	USBASP_OLD_VID      0x03EB  /* ATMEL */
-#define	USBASP_OLD_PID	    0xC7B4  /* (unoffical) USBasp */
-
-#define	USBASP_NIBOBEE_VID  0x16C0  /* VOTI */
-#define	USBASP_NIBOBEE_PID  0x092F  /* NIBObee PID */
 
 /* USB function call identifiers */
 #define USBASP_FUNC_CONNECT    1
@@ -140,6 +129,7 @@ typedef struct sckoptions_t {
 extern "C" {
 #endif
 
+extern const char usbasp_desc[];
 void usbasp_initpgm (PROGRAMMER * pgm);
 
 #ifdef __cplusplus

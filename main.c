@@ -1,7 +1,7 @@
 /*
  * avrdude - A Downloader/Uploader for AVR device programmers
  * Copyright (C) 2000-2005  Brian S. Dean <bsd@bsdhome.com>
- * Copyright 2007-2009 Joerg Wunsch <j@uriah.heep.sax.de>
+ * Copyright 2007-2014 Joerg Wunsch <j@uriah.heep.sax.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,11 +14,10 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* $Id: main.c 1014 2011-09-15 15:20:59Z joerg_wunsch $ */
+/* $Id: main.c 1294 2014-03-12 23:03:18Z joerg_wunsch $ */
 
 /*
  * Code to program an Atmel AVR device through one of the supported
@@ -55,6 +54,7 @@
 #include "term.h"
 #include "safemode.h"
 #include "update.h"
+#include "pgm_type.h"
 
 
 /* Get VERSION from ac_cfg.h */
@@ -71,16 +71,17 @@ struct list_walk_cookie
     const char *prefix;
 };
 
-static LISTID updates;
+static LISTID updates = NULL;
 
-static LISTID extended_params;
+static LISTID extended_params = NULL;
+
+static LISTID additional_config_files = NULL;
 
 static PROGRAMMER * pgm;
 
 /*
  * global options
  */
-int    do_cycles;   /* track erase-rewrite cycles */
 int    verbose;     /* verbose output */
 int    quell_progress; /* un-verebose output */
 int    ovsigck;     /* 1=override sig check, 0=don't */
@@ -121,6 +122,7 @@ static void usage(void)
  "  -Y <number>                Initialize erase cycle # in EEPROM.\n"
  "  -v                         Verbose output. -v -v for more.\n"
  "  -q                         Quell progress output. -q -q for less.\n"
+ "  -l logfile                 Use logfile rather than stderr for diagnostics.\n"
  "  -?                         Display this usage.\n"
  "\navrdude version %s, URL: <http://savannah.nongnu.org/projects/avrdude/>\n"
           ,progname, version);
@@ -155,8 +157,8 @@ static void update_progress_tty (int percent, double etime, char *hdr)
   }
 
   if (percent == 100) {
+    if (!last) fprintf (stderr, "\n\n");
     last = 1;
-    fprintf (stderr, "\n\n");
   }
 
   setvbuf(stderr, (char*)NULL, _IOLBF, 0);
@@ -198,9 +200,13 @@ static void list_programmers_callback(const char *name, const char *desc,
                                       void *cookie)
 {
     struct list_walk_cookie *c = (struct list_walk_cookie *)cookie;
-
-    fprintf(c->f, "%s%-8s = %-30s [%s:%d]\n",
-            c->prefix, name, desc, cfgname, cfglineno);
+    if (verbose){
+        fprintf(c->f, "%s%-16s = %-30s [%s:%d]\n",
+                c->prefix, name, desc, cfgname, cfglineno);
+    } else {
+        fprintf(c->f, "%s%-16s = %-s\n",
+                c->prefix, name, desc);
+    }
 }
 
 static void list_programmers(FILE * f, const char *prefix, LISTID programmers)
@@ -210,7 +216,27 @@ static void list_programmers(FILE * f, const char *prefix, LISTID programmers)
     c.f = f;
     c.prefix = prefix;
 
+    sort_programmers(programmers);
+
     walk_programmers(programmers, list_programmers_callback, &c);
+}
+
+static void list_programmer_types_callback(const char *name, const char *desc,
+                                      void *cookie)
+{
+    struct list_walk_cookie *c = (struct list_walk_cookie *)cookie;
+    fprintf(c->f, "%s%-16s = %-s\n",
+                c->prefix, name, desc);
+}
+
+static void list_programmer_types(FILE * f, const char *prefix)
+{
+    struct list_walk_cookie c;
+
+    c.f = f;
+    c.prefix = prefix;
+
+    walk_programmer_types(list_programmer_types_callback, &c);
 }
 
 static void list_avrparts_callback(const char *name, const char *desc,
@@ -219,8 +245,17 @@ static void list_avrparts_callback(const char *name, const char *desc,
 {
     struct list_walk_cookie *c = (struct list_walk_cookie *)cookie;
 
-    fprintf(c->f, "%s%-4s = %-15s [%s:%d]\n",
-            c->prefix, name, desc, cfgname, cfglineno);
+    /* hide ids starting with '.' */
+    if ((verbose < 2) && (name[0] == '.'))
+        return;
+
+    if (verbose) {
+        fprintf(c->f, "%s%-8s = %-18s [%s:%d]\n",
+                c->prefix, name, desc, cfgname, cfglineno);
+    } else {
+        fprintf(c->f, "%s%-8s = %s\n",
+                c->prefix, name, desc);
+    }
 }
 
 static void list_parts(FILE * f, const char *prefix, LISTID avrparts)
@@ -230,6 +265,8 @@ static void list_parts(FILE * f, const char *prefix, LISTID avrparts)
     c.f = f;
     c.prefix = prefix;
 
+    sort_avrparts(avrparts);
+
     walk_avrparts(avrparts, list_avrparts_callback, &c);
 }
 
@@ -237,6 +274,24 @@ static void exithook(void)
 {
     if (pgm->teardown)
         pgm->teardown(pgm);
+}
+
+static void cleanup_main(void)
+{
+    if (updates) {
+        ldestroy_cb(updates, (void(*)(void*))free_update);
+        updates = NULL;
+    }
+    if (extended_params) {
+        ldestroy(extended_params);
+        extended_params = NULL;
+    }
+    if (additional_config_files) {
+        ldestroy(additional_config_files);
+        additional_config_files = NULL;
+    }
+
+    cleanup_config();
 }
 
 /*
@@ -259,19 +314,14 @@ int main(int argc, char * argv [])
   /* options / operating mode variables */
   int     erase;       /* 1=erase chip, 0=don't */
   int     calibrate;   /* 1=calibrate RC oscillator, 0=don't */
-  int     auto_erase;  /* 0=never erase unless explicity told to do
-                          so, 1=erase if we are going to program flash */
   char  * port;        /* device port (/dev/xxx) */
   int     terminal;    /* 1=enter terminal mode, 0=don't */
-  int     nowrite;     /* don't actually write anything to the chip */
   int     verify;      /* perform a verify operation */
   char  * exitspecs;   /* exit specs string from command line */
   char  * programmer;  /* programmer id */
   char  * partdesc;    /* part id */
   char    sys_config[PATH_MAX]; /* system wide config file */
   char    usr_config[PATH_MAX]; /* per-user config file */
-  int     cycles;      /* erase-rewrite cycles */
-  int     set_cycles;  /* value to set the erase-rewrite cycles to */
   char  * e;           /* for strtol() error checking */
   int     baudrate;    /* override default programmer baud rate */
   double  bitclock;    /* Specify programmer bit clock (JTAG ICE) */
@@ -280,6 +330,8 @@ int main(int argc, char * argv [])
   int     silentsafe;  /* Don't ask about fuses, 1=silent, 0=normal */
   int     init_ok;     /* Device initialization worked well */
   int     is_open;     /* Device open succeeded */
+  char  * logfile;     /* Use logfile rather than stderr for diagnostics */
+  enum updateflags uflags = UF_AUTO_ERASE; /* Flags for do_op() */
   unsigned char safemode_lfuse = 0xff;
   unsigned char safemode_hfuse = 0xff;
   unsigned char safemode_efuse = 0xff;
@@ -314,8 +366,11 @@ int main(int argc, char * argv [])
   default_parallel[0] = 0;
   default_serial[0]   = 0;
   default_bitclock    = 0.0;
+  default_safemode    = -1;
 
   init_config();
+
+  atexit(cleanup_main);
 
   updates = lcreat(NULL, 0);
   if (updates == NULL) {
@@ -329,34 +384,32 @@ int main(int argc, char * argv [])
     exit(1);
   }
 
+  additional_config_files = lcreat(NULL, 0);
+  if (additional_config_files == NULL) {
+    fprintf(stderr, "%s: cannot initialize additional config files list\n", progname);
+    exit(1);
+  }
+
   partdesc      = NULL;
-  port          = default_parallel;
+  port          = NULL;
   erase         = 0;
   calibrate     = 0;
-  auto_erase    = 1;
   p             = NULL;
   ovsigck       = 0;
   terminal      = 0;
-  nowrite       = 0;
   verify        = 1;        /* on by default */
   quell_progress = 0;
   exitspecs     = NULL;
   pgm           = NULL;
   programmer    = default_programmer;
   verbose       = 0;
-  do_cycles     = 0;
-  set_cycles    = -1;
   baudrate      = 0;
   bitclock      = 0.0;
   ispdelay      = 0;
   safemode      = 1;       /* Safemode on by default */
   silentsafe    = 0;       /* Ask by default */
   is_open       = 0;
-
-  if (isatty(STDIN_FILENO) == 0)
-      safemode  = 0;       /* Turn off safemode if this isn't a terminal */
-
-
+  logfile       = NULL;
 
 #if defined(WIN32NATIVE)
 
@@ -400,7 +453,7 @@ int main(int argc, char * argv [])
   /*
    * process command line arguments
    */
-  while ((ch = getopt(argc,argv,"?b:B:c:C:DeE:Fi:np:OP:qstU:uvVx:yY:")) != -1) {
+  while ((ch = getopt(argc,argv,"?b:B:c:C:DeE:Fi:l:np:OP:qstU:uvVx:yY:")) != -1) {
 
     switch (ch) {
       case 'b': /* override default programmer baud rate */
@@ -435,16 +488,21 @@ int main(int argc, char * argv [])
         break;
 
       case 'C': /* system wide configuration file */
-        strncpy(sys_config, optarg, PATH_MAX);
-        sys_config[PATH_MAX-1] = 0;
+        if (optarg[0] == '+') {
+          ladd(additional_config_files, optarg+1);
+        } else {
+          strncpy(sys_config, optarg, PATH_MAX);
+          sys_config[PATH_MAX-1] = 0;
+        }
         break;
 
       case 'D': /* disable auto erase */
-        auto_erase = 0;
+        uflags &= ~UF_AUTO_ERASE;
         break;
 
       case 'e': /* perform a chip erase */
         erase = 1;
+        uflags &= ~UF_AUTO_ERASE;
         break;
 
       case 'E':
@@ -455,8 +513,12 @@ int main(int argc, char * argv [])
         ovsigck = 1;
         break;
 
+      case 'l':
+	logfile = optarg;
+	break;
+
       case 'n':
-        nowrite = 1;
+        uflags |= UF_NOWRITE;
         break;
 
       case 'O': /* perform RC oscillator calibration */
@@ -517,17 +579,13 @@ int main(int argc, char * argv [])
         break;
 
       case 'y':
-        do_cycles = 1;
+        fprintf(stderr, "%s: erase cycle counter no longer supported\n",
+                progname);
         break;
 
       case 'Y':
-        set_cycles = strtol(optarg, &e, 0);
-        if ((e == optarg) || (*e != 0)) {
-          fprintf(stderr, "%s: invalid cycle count '%s'\n",
-                  progname, optarg);
-          exit(1);
-        }
-        do_cycles = 1;
+        fprintf(stderr, "%s: erase cycle counter no longer supported\n",
+                progname);
         break;
 
       case '?': /* help */
@@ -544,6 +602,15 @@ int main(int argc, char * argv [])
 
   }
 
+  if (logfile != NULL) {
+    FILE *newstderr = freopen(logfile, "w", stderr);
+    if (newstderr == NULL) {
+      /* Help!  There's no stderr to complain to anymore now. */
+      printf("Cannot create logfile \"%s\": %s\n",
+	     logfile, strerror(errno));
+      return 1;
+    }
+  }
 
   if (quell_progress == 0) {
     if (isatty (STDERR_FILENO))
@@ -566,7 +633,7 @@ int main(int argc, char * argv [])
     fprintf(stderr,
             "\n%s: Version %s, compiled on %s at %s\n"
             "%sCopyright (c) 2000-2005 Brian Dean, http://www.bdmicro.com/\n"
-	    "%sCopyright (c) 2007-2009 Joerg Wunsch\n\n",
+	    "%sCopyright (c) 2007-2014 Joerg Wunsch\n\n",
             progname, version, __DATE__, __TIME__, progbuf, progbuf);
   }
 
@@ -607,6 +674,28 @@ int main(int argc, char * argv [])
       }
     }
   }
+
+  if (lsize(additional_config_files) > 0) {
+    LNODEID ln1;
+    const char * p = NULL;
+
+    for (ln1=lfirst(additional_config_files); ln1; ln1=lnext(ln1)) {
+      p = ldata(ln1);
+      if (verbose) {
+        fprintf(stderr, "%sAdditional configuration file is \"%s\"\n",
+                progbuf, p);
+      }
+
+      rc = read_config(p);
+      if (rc) {
+        fprintf(stderr,
+                "%s: error reading additional configuration file \"%s\"\n",
+                progname, p);
+        exit(1);
+      }
+    }
+  }
+
   // set bitclock from configuration files unless changed by command line
   if (default_bitclock > 0 && bitclock == 0.0) {
     bitclock = default_bitclock;
@@ -631,6 +720,13 @@ int main(int argc, char * argv [])
       fprintf(stderr, "\n");
       fprintf(stderr,"Valid programmers are:\n");
       list_programmers(stderr, "  ", programmers);
+      fprintf(stderr,"\n");
+      exit(1);
+    }
+    if (strcmp(programmer, "?type") == 0) {
+      fprintf(stderr, "\n");
+      fprintf(stderr,"Valid programmer types are:\n");
+      list_programmer_types(stderr, "  ");
       fprintf(stderr,"\n");
       exit(1);
     }
@@ -660,6 +756,15 @@ int main(int argc, char * argv [])
     exit(1);
   }
 
+  if (pgm->initpgm) {
+    pgm->initpgm(pgm);
+  } else {
+    fprintf(stderr,
+            "\n%s: Can't initialize the programmer.\n\n",
+            progname);
+    exit(1);
+  }
+
   if (pgm->setup) {
     pgm->setup(pgm);
   }
@@ -683,16 +788,23 @@ int main(int argc, char * argv [])
     }
   }
 
-  if ((strcmp(pgm->type, "STK500") == 0) ||
-      (strcmp(pgm->type, "avr910") == 0) ||
-      (strcmp(pgm->type, "BusPirate") == 0) ||
-      (strcmp(pgm->type, "STK500V2") == 0) ||
-      (strcmp(pgm->type, "JTAGMKII") == 0)) {
-    if (port == default_parallel) {
-      port = default_serial;
+  if (port == NULL) {
+    switch (pgm->conntype)
+    {
+      case CONNTYPE_PARALLEL:
+        port = default_parallel;
+        break;
+
+      case CONNTYPE_SERIAL:
+        port = default_serial;
+        break;
+
+      case CONNTYPE_USB:
+        port = DEFAULT_USB;
+        break;
     }
   }
-  
+
   if (partdesc == NULL) {
     fprintf(stderr,
             "%s: No AVR part has been specified, use \"-p Part\"\n\n",
@@ -729,9 +841,22 @@ int main(int argc, char * argv [])
     }
   }
 
+  if (default_safemode == 0) {
+    /* configuration disables safemode: revert meaning of -u */
+    if (safemode == 0)
+      /* -u was given: enable safemode */
+      safemode = 1;
+    else
+      /* -u not given: turn off */
+      safemode = 0;
+  }
+
+  if (isatty(STDIN_FILENO) == 0 && silentsafe == 0)
+    safemode  = 0;       /* Turn off safemode if this isn't a terminal */
+
+
   if(p->flags & AVRPART_AVR32) {
     safemode = 0;
-    auto_erase = 0;
   }
 
   if(p->flags & (AVRPART_HAS_PDI | AVRPART_HAS_TPI)) {
@@ -744,6 +869,30 @@ int main(int argc, char * argv [])
     fprintf(stderr, "\n%s: failed to initialize memories\n",
             progname);
     exit(1);
+  }
+
+  /*
+   * Now that we know which part we are going to program, locate any
+   * -U options using the default memory region, and fill in the
+   * device-dependent default region name, either "application" (for
+   * Xmega devices), or "flash" (everything else).
+   */
+  for (ln=lfirst(updates); ln; ln=lnext(ln)) {
+    upd = ldata(ln);
+    if (upd->memtype == NULL) {
+      const char *mtype = (p->flags & AVRPART_HAS_PDI)? "application": "flash";
+      if (verbose >= 2) {
+        fprintf(stderr,
+                "%s: defaulting memtype in -U %c:%s option to \"%s\"\n",
+                progname,
+                (upd->op == DEVICE_READ)? 'r': (upd->op == DEVICE_WRITE)? 'w': 'v',
+                upd->filename, mtype);
+      }
+      if ((upd->memtype = strdup(mtype)) == NULL) {
+        fprintf(stderr, "%s: out of memory\n", progname);
+        exit(1);
+      }
+    }
   }
 
   /*
@@ -876,6 +1025,11 @@ int main(int argc, char * argv [])
    * are valid.
    */
   if(!(p->flags & AVRPART_AVR32)) {
+    int attempt = 0;
+    int waittime = 10000;       /* 10 ms */
+
+  sig_again:
+    usleep(waittime);
     if (init_ok) {
       rc = avr_signature(pgm, p);
       if (rc != 0) {
@@ -909,11 +1063,17 @@ int main(int argc, char * argv [])
         if (sig->buf[i] != 0x00)
           zz = 0;
       }
-      if (quell_progress < 2) {
-        fprintf(stderr, "\n");
-      }
-
       if (ff || zz) {
+        if (++attempt < 3) {
+          waittime *= 5;
+          if (quell_progress < 2) {
+              fprintf(stderr, " (retrying)\n");
+          }
+          goto sig_again;
+        }
+        if (quell_progress < 2) {
+            fprintf(stderr, "\n");
+        }
         fprintf(stderr,
                 "%s: Yikes!  Invalid device signature.\n", progname);
         if (!ovsigck) {
@@ -924,23 +1084,27 @@ int main(int argc, char * argv [])
           exitrc = 1;
           goto main_exit;
         }
+      } else {
+        if (quell_progress < 2) {
+          fprintf(stderr, "\n");
+        }
       }
-    }
-    
-    if (sig->size != 3 ||
-    sig->buf[0] != p->signature[0] ||
-    sig->buf[1] != p->signature[1] ||
-    sig->buf[2] != p->signature[2]) {
-      fprintf(stderr,
-          "%s: Expected signature for %s is %02X %02X %02X\n",
-          progname, p->desc,
-          p->signature[0], p->signature[1], p->signature[2]);
-      if (!ovsigck) {
-        fprintf(stderr, "%sDouble check chip, "
-        "or use -F to override this check.\n",
-                progbuf);
-        exitrc = 1;
-        goto main_exit;
+
+      if (sig->size != 3 ||
+          sig->buf[0] != p->signature[0] ||
+          sig->buf[1] != p->signature[1] ||
+          sig->buf[2] != p->signature[2]) {
+        fprintf(stderr,
+                "%s: Expected signature for %s is %02X %02X %02X\n",
+                progname, p->desc,
+                p->signature[0], p->signature[1], p->signature[2]);
+        if (!ovsigck) {
+          fprintf(stderr, "%sDouble check chip, "
+                  "or use -F to override this check.\n",
+                  progbuf);
+          exitrc = 1;
+          goto main_exit;
+        }
       }
     }
   }
@@ -979,65 +1143,37 @@ int main(int argc, char * argv [])
     }
   }
 
-  if ((erase == 0) && (auto_erase == 1)) {
-    AVRMEM * m;
-    for (ln=lfirst(updates); ln; ln=lnext(ln)) {
-      upd = ldata(ln);
-      m = avr_locate_mem(p, upd->memtype);
-      if (m == NULL)
-        continue;
-      if ((strcasecmp(m->desc, "flash") == 0) && (upd->op == DEVICE_WRITE)) {
-        erase = 1;
-        if (quell_progress < 2) {
-          fprintf(stderr,
-                "%s: NOTE: FLASH memory has been specified, an erase cycle "
-                "will be performed\n"
-                "%sTo disable this feature, specify the -D option.\n",
-                progname, progbuf);
-        }
-        break;
-      }
-    }
-  }
-
-  /*
-   * Display cycle count, if and only if it is not set later on.
-   *
-   * The cycle count will be displayed anytime it will be changed later.
-   */
-  if (init_ok && !(p->flags & AVRPART_AVR32) && do_cycles) {
-    /*
-     * see if the cycle count in the last four bytes of eeprom seems
-     * reasonable
-     */
-    rc = avr_get_cycle_count(pgm, p, &cycles);
-    if (quell_progress < 2) {
-      if ((rc >= 0) && (cycles != 0)) {
-        fprintf(stderr,
-              "%s: current erase-rewrite cycle count is %d\n",
-              progname, cycles);
-      }
-    }
-  }
-
-  if (init_ok && set_cycles != -1 && !(p->flags & AVRPART_AVR32)) {
-    rc = avr_get_cycle_count(pgm, p, &cycles);
-    if (rc == 0) {
-      /*
-       * only attempt to update the cycle counter if we can actually
-       * read the old value
-       */
-      cycles = set_cycles;
+  if (uflags & UF_AUTO_ERASE) {
+    if ((p->flags & AVRPART_HAS_PDI) && pgm->page_erase != NULL &&
+        lsize(updates) > 0) {
       if (quell_progress < 2) {
-        fprintf(stderr, "%s: setting erase-rewrite cycle count to %d\n",
-              progname, cycles);
-      }
-      rc = avr_put_cycle_count(pgm, p, cycles);
-      if (rc < 0) {
         fprintf(stderr,
-                "%s: WARNING: failed to update the erase-rewrite cycle "
-                "counter\n",
-                progname);
+                "%s: NOTE: Programmer supports page erase for Xmega devices.\n"
+                "%sEach page will be erased before programming it, but no chip erase is performed.\n"
+                "%sTo disable page erases, specify the -D option; for a chip-erase, use the -e option.\n",
+                progname, progbuf, progbuf);
+      }
+    } else {
+      AVRMEM * m;
+      const char *memname = (p->flags & AVRPART_HAS_PDI)? "application": "flash";
+
+      uflags &= ~UF_AUTO_ERASE;
+      for (ln=lfirst(updates); ln; ln=lnext(ln)) {
+        upd = ldata(ln);
+        m = avr_locate_mem(p, upd->memtype);
+        if (m == NULL)
+          continue;
+        if ((strcasecmp(m->desc, memname) == 0) && (upd->op == DEVICE_WRITE)) {
+          erase = 1;
+          if (quell_progress < 2) {
+            fprintf(stderr,
+                    "%s: NOTE: \"%s\" memory has been specified, an erase cycle "
+                    "will be performed\n"
+                    "%sTo disable this feature, specify the -D option.\n",
+                    progname, memname, progbuf);
+          }
+          break;
+        }
       }
     }
   }
@@ -1047,7 +1183,7 @@ int main(int argc, char * argv [])
      * erase the chip's flash and eeprom memories, this is required
      * before the chip can accept new programming
      */
-    if (nowrite) {
+    if (uflags & UF_NOWRITE) {
       fprintf(stderr,
 	      "%s: conflicting -e and -n options specified, NOT erasing chip\n",
 	      progname);
@@ -1078,7 +1214,7 @@ int main(int argc, char * argv [])
 
   for (ln=lfirst(updates); ln; ln=lnext(ln)) {
     upd = ldata(ln);
-    rc = do_op(pgm, p, upd, nowrite);
+    rc = do_op(pgm, p, upd, uflags);
     if (rc) {
       exitrc = 1;
       break;
@@ -1228,7 +1364,8 @@ int main(int argc, char * argv [])
     if (quell_progress < 2) {
       fprintf(stderr, "%s: safemode: ", progname);
       if (failures == 0) {
-        fprintf(stderr, "Fuses OK\n");
+        fprintf(stderr, "Fuses OK (E:%02X, H:%02X, L:%02X)\n",
+                safemode_efuse, safemode_hfuse, safemode_lfuse);
       }
       else {
         fprintf(stderr, "Fuses not recovered, sorry\n");
@@ -1254,9 +1391,9 @@ main_exit:
     pgm->disable(pgm);
 
     pgm->rdy_led(pgm, OFF);
-  }
 
-  pgm->close(pgm);
+    pgm->close(pgm);
+  }
 
   if (quell_progress < 2) {
     fprintf(stderr, "\n%s done.  Thank you.\n\n", progname);

@@ -1,6 +1,6 @@
 ## -*- mode: rpm-spec; -*-
 ##
-## $Id: avrdude.spec.in 558 2005-11-29 20:28:51Z joerg_wunsch $
+## $Id: avrdude.spec.in 1294 2014-03-12 23:03:18Z joerg_wunsch $
 ##
 ## avrdude.spec.  Generated from avrdude.spec.in by configure.
 ##
@@ -12,7 +12,7 @@
 
 Summary: AVRDUDE is software for programming Atmel AVR Microcontrollers.
 Name: avrdude
-Version: 5.11svn-20111019
+Version: 6.1-pi
 Release: 1
 URL: http://savannah.nongnu.org/projects/avrdude
 Source0: %{name}-%{version}.tar.gz
