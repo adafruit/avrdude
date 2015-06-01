@@ -8,8 +8,8 @@ To build and install on the Pi make sure you have necessary dependencies by
 running the following commands (on Raspbian):
 
   sudo apt-get update
-  sudo apt-get install -y build-essential bison flex libelf-dev libusb-1.0-0-dev \
-  libusb-dev libftdi-dev libftdi1
+  sudo apt-get install -y build-essential bison flex automake libelf-dev \ 
+  libusb-1.0-0-dev libusb-dev libftdi-dev libftdi1
 
 Then run a typical ./configure, make and make install with:
 
